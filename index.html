@@ -3,9 +3,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Institutional Cleaning Product Selector</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>Hello World pranav subba reddy</h1>
+    <header class="hero">
+        <div class="hero-content">
+            <h1>Institutional Cleaning Product Selector</h1>
+            <p>Choose the right cleaning products for schools, offices, hospitals, and more.</p>
+        </div>
+    </header>
+
+    <main class="container">
+        <section class="intro-card">
+            <h2>How it works</h2>
+            <p>Pick the facility type below, then review recommended products optimized for safety, effectiveness, and indoor use.</p>
+        </section>
+
+        <section class="selector-panel">
+            <div class="filter-card">
+                <h3>Facility type</h3>
+                <select>
+                    <option>Office cleaning</option>
+                    <option>School cleaning</option>
+                    <option>Healthcare cleaning</option>
+                    <option>Industrial cleaning</option>
+                    <option>Hospitality cleaning</option>
+                </select>
+            </div>
+            <div class="filter-card">
+                <h3>Cleaning goal</h3>
+                <select>
+                    <option>Daily maintenance</option>
+                    <option>Disinfection</option>
+                    <option>Stain removal</option>
+                    <option>Floor care</option>
+                </select>
+            </div>
+        </section>
+
+        <section class="products-grid">
+            <article class="product-card">
+                <h3>All-Purpose Surface Cleaner</h3>
+                <p>Safe for desks, countertops, glass, and high-touch areas. Low-odor, fast-drying formula.</p>
+                <span class="badge">Multi-surface</span>
+            </article>
+            <article class="product-card">
+                <h3>Hospital-Grade Disinfectant</h3>
+                <p>EPA-approved disinfectant for critical environments. Kills bacteria and viruses on contact.</p>
+                <span class="badge">Disinfection</span>
+            </article>
+            <article class="product-card">
+                <h3>Floor Maintenance Solution</h3>
+                <p>Ideal for hard floors, vinyl, and tile. Cleans, shines, and protects high-traffic corridors.</p>
+                <span class="badge">Floor care</span>
+            </article>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p>Built for institutional cleaning planning and product guidance.</p>
+    </footer>
 </body>
 </html>
