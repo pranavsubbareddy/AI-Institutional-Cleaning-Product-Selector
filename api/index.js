@@ -1,6 +1,6 @@
 // Vercel Serverless Entry Point
-// Imports the Express app from the backend and exports it as a serverless function handler
-const app = require('../Backend/server');
+// Uses MySQL database for persistent storage (via PlanetScale)
+// Set DATABASE_URL in Vercel environment variables to connect
+const app = require('./db');
 
-// Vercel expects the exported handler to be a function or a full Express app
 module.exports = app;

@@ -10,22 +10,39 @@ function getPool() {
 }
 
 async function initializeSchema() {
-  const host = process.env.DB_HOST || 'localhost';
-  const user = process.env.DB_USER || 'root';
-  const password = process.env.DB_PASSWORD || '';
-  const database = process.env.DB_NAME || 'cleaning_platform';
+  // Support both DATABASE_URL (PlanetScale) and individual DB_* env vars
+  const databaseUrl = process.env.DATABASE_URL;
 
-  const tempConn = await mysql.createConnection({ host, user, password });
-  await tempConn.execute(`CREATE DATABASE IF NOT EXISTS \`${database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
-  await tempConn.end();
+  if (databaseUrl) {
+    // PlanetScale provides a connection string like:
+    // mysql://username:password@host/dbname?ssl={"rejectUnauthorized":true}
+    pool = mysql.createPool({
+      uri: databaseUrl,
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0,
+      dateStrings: true
+    });
+    console.log(' Connected to MySQL via DATABASE_URL');
+  } else {
+    const host = process.env.DB_HOST || 'localhost';
+    const user = process.env.DB_USER || 'root';
+    const password = process.env.DB_PASSWORD || '';
+    const database = process.env.DB_NAME || 'cleaning_platform';
 
-  pool = mysql.createPool({
-    host, user, password, database,
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0,
-    dateStrings: true
-  });
+    const tempConn = await mysql.createConnection({ host, user, password });
+    await tempConn.execute(`CREATE DATABASE IF NOT EXISTS \`${database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+    await tempConn.end();
+
+    pool = mysql.createPool({
+      host, user, password, database,
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0,
+      dateStrings: true
+    });
+    console.log(' Connected to MySQL database:', database);
+  }
 
   console.log(' Connected to MySQL database:', database);
 
