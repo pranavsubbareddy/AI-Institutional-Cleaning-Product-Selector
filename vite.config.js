@@ -1,10 +1,10 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   root: 'frontend',
   plugins: [react()],
-  base: process.env.NODE_ENV === 'production' ? '/AI-Institutional-Cleaning-Product-Selector/' : '/',
+  base: mode === 'production' ? '/AI-Institutional-Cleaning-Product-Selector/' : '/',
   build: {
     outDir: 'dist',
   },
@@ -17,4 +17,4 @@ export default defineConfig({
       }
     }
   }
-})
+}))

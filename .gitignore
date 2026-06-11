@@ -6,3 +6,7 @@ build/
 .DS_Store
 .idea/
 .vscode/
+
+# Build output - don't track dist in git (GitHub Actions builds it on deploy)
+frontend/dist/
+Backend/node_modules/
