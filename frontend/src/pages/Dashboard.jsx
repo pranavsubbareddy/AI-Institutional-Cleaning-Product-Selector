@@ -4,6 +4,7 @@ import { api, formatCurrency } from '../services/api';
 import LoadingState from '../components/LoadingState';
 import ErrorState from '../components/ErrorState';
 import EmptyState from '../components/EmptyState';
+import DashboardSkeleton from '../components/DashboardSkeleton';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -12,10 +13,19 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [viewMode, setViewMode] = useState('cards');
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     fetchDashboard();
   }, []);
+
+  // Smooth transition: briefly show skeleton while content fades in
+  useEffect(() => {
+    if (!loading && !ready) {
+      const timer = setTimeout(() => setReady(true), 80);
+      return () => clearTimeout(timer);
+    }
+  }, [loading, ready]);
 
   const fetchDashboard = async () => {
     try {
@@ -33,8 +43,14 @@ export default function Dashboard() {
     }
   };
 
-  if (loading) return <LoadingState message="Loading dashboard..." />;
-  if (error) return <ErrorState message={error} onRetry={fetchDashboard} />;
+  // Show skeleton during loading, then smoothly transition to content
+  if (loading && !ready) {
+    return <DashboardSkeleton viewMode={viewMode} />;
+  }
+
+  if (error && !stats) {
+    return <ErrorState message={error} onRetry={fetchDashboard} />;
+  }
 
   const overview = stats?.overview || {};
 
@@ -51,7 +67,9 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="animate-fade-in">
+    <div
+      className={`transition-all duration-500 ease-out ${ready ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
+    >
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
         <div>
