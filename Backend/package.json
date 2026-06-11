@@ -1,0 +1,27 @@
+{
+  "name": "ai-cleaning-product-selector-backend",
+  "version": "1.0.0",
+  "description": "Backend for AI Institutional Cleaning Product Selector - Ganga Maxx Marketplace",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "seed": "node src/database/seed.js",
+    "test": "jest --verbose",
+    "test:watch": "jest --watch --verbose"
+  },
+  "dependencies": {
+    "@google/genai": "^2.8.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
+    "express": "^4.21.0",
+    "express-validator": "^7.3.2",
+    "lodash": "^4.17.21",
+    "morgan": "^1.10.0",
+    "mysql2": "^3.22.3",
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "jest": "^30.4.2"
+  }
+}
