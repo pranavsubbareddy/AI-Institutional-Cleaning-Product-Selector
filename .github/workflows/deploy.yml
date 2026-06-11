@@ -35,6 +35,8 @@ jobs:
 
       - name: Build
         run: npm run build
+        env:
+          VITE_API_URL: https://ai-institutional-cleaning-product-s.vercel.app
 
       - name: Add SPA fallback for GitHub Pages
         run: cp frontend/dist/index.html frontend/dist/404.html
