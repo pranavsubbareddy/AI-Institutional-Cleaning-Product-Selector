@@ -1,4 +1,6 @@
-const API_BASE = '/api';
+// In development, Vite proxies /api to the backend (see vite.config.js)
+// In production, set VITE_API_URL to your deployed backend URL (e.g., https://your-app.railway.app)
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 async function fetchApi(endpoint, options = {}) {
   const url = `${API_BASE}${endpoint}`;

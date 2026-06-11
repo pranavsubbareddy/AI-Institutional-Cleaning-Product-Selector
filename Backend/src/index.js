@@ -9,7 +9,7 @@ async function startServer() {
   const app = express();
   const PORT = process.env.PORT || 5000;
 
-  const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:3000,http://localhost:4173')
+  const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:3000,http://localhost:4173,https://ai-institutional-cleaning-product-s.vercel.app')
     .split(',')
     .map(s => s.trim());
   app.use(cors({ origin: allowedOrigins, credentials: true }));
