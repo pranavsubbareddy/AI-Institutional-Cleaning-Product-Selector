@@ -31,13 +31,13 @@ jobs:
           node-version: 20
 
       - name: Install dependencies
-        run: cd Frontend && npm install
+        run: npm install
 
       - name: Build
-        run: cd Frontend && npm run build
+        run: npm run build
 
       - name: Add SPA fallback for GitHub Pages
-        run: cp Frontend/dist/index.html Frontend/dist/404.html
+        run: cp frontend/dist/index.html frontend/dist/404.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -45,7 +45,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: Frontend/dist
+          path: frontend/dist
 
       - name: Deploy to GitHub Pages
         id: deployment
