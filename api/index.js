@@ -1,6 +1,7 @@
 // Vercel Serverless Entry Point
-// Uses MySQL database for persistent storage (via PlanetScale)
-// Set DATABASE_URL in Vercel environment variables to connect
-const app = require('./db');
+// Currently uses in-memory storage via Backend/server.js
+// To switch to persistent MySQL (PlanetScale), uncomment the line below and set DATABASE_URL in Vercel env:
+// const app = require('./db');
+const app = require('../Backend/server');
 
 module.exports = app;
