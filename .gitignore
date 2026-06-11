@@ -10,3 +10,6 @@ build/
 # Build output - don't track dist in git (GitHub Actions builds it on deploy)
 frontend/dist/
 Backend/node_modules/
+
+# Vercel
+.vercel/

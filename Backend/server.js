@@ -143,4 +143,10 @@ app.get('/api/dashboard/summary', (req, res) => {
 app.use((req, res) => res.status(404).json({success:false,error:'Route not found',path:req.originalUrl,timestamp:new Date().toISOString()}));
 app.use((err, req, res, next) => {console.error(err);res.status(err.status||500).json({success:false,error:err.message||'Internal server error',details:process.env.NODE_ENV==='development'?err.stack:undefined,timestamp:new Date().toISOString()});});
 
-app.listen(PORT, '0.0.0.0', () => console.log(`\n  Standalone API running on http://localhost:${PORT}\n`));
+// Export for Vercel serverless deployment
+module.exports = app;
+
+// Start server only when running directly (not when imported by Vercel)
+if (require.main === module) {
+  app.listen(PORT, '0.0.0.0', () => console.log(`\n  Standalone API running on http://localhost:${PORT}\n`));
+}
