@@ -7,9 +7,9 @@ const RecommendationSchema = z.object({
   recommendations: z
     .array(
       z.object({
-        productId: z.string().describe('Must match one of the catalog product IDs exactly'),
-        sku: z.string().describe('Product SKU code'),
-        name: z.string().describe('Exact catalog product name'),
+        productId: z.string().describe('Unique product ID (generate your own, e.g., AI-PROD-001)'),
+        sku: z.string().describe('Product SKU code (generate your own)'),
+        name: z.string().describe('Real institutional cleaning product name with brand'),
         recommended_dilution: z.string().describe('Dilution ratio or "Ready to use"'),
         estimated_monthly_qty_units: z.number().describe('Estimated monthly quantity in units'),
         calculated_cost: z.number().describe('Calculated monthly cost in INR'),
@@ -17,7 +17,7 @@ const RecommendationSchema = z.object({
         safety_notes: z.string().describe('Safety precautions'),
       })
     )
-    .describe('Array of 3-8 recommended products'),
+    .describe('Array of recommended products — all that are relevant'),
   summary: z.object({
     grossAggregatedCost: z.number().describe('Total monthly cost of all recommended products in INR'),
     financialStatusAlert: z.string().nullable().describe('Budget/financial alert message or null'),
@@ -106,8 +106,8 @@ function getStructuredModel(key, provider) {
     const chatModel = new ChatGoogleGenerativeAI({
       apiKey: key,
       model: geminiModel,
-      temperature: 0.4,
-      maxOutputTokens: 4096,
+      temperature: 0.3,
+      maxOutputTokens: 8192,
     });
     model = chatModel.withStructuredOutput(RecommendationSchema, {
       name: 'recommendation',
@@ -299,124 +299,40 @@ function escapeControlCharsInStrings(input) {
 
 function buildPrompt(params, catalog) {
   const meta = params.metadata || {};
-  const equipment = (meta.equipment || []).join(', ') || 'None reported';
-  const preferences = (meta.preferences || []).join(', ') || 'None specified';
-  const certifications = (meta.certifications || []).join(', ') || 'None specified';
-  const floors = meta.floors || 1;
-  const occupants = meta.occupants || 'Unknown';
-  const operatingHours = meta.operating_hours || 'Standard';
-  const facilityAge = meta.facility_age || 'Moderate';
-  const cleaningFreq = meta.cleaning_frequency || 'Daily';
+  const equipment = (meta.equipment || []).join(', ') || 'None';
+  const area = params.area_size ? `${params.area_size} sq ft` : 'Unknown';
+  const surfaces = (params.surface_types || []).join(', ') || 'Various';
+  const hygiene = params.hygiene_standard || 'Standard';
+  const budget = params.budget || 'Medium';
+  const instType = params.institution_type || 'Facility';
 
-  const institutionTypeLabels = {
-    hospital: 'Hospital / Healthcare',
-    school: 'School / Educational',
-    hotel: 'Hotel / Hospitality',
-    office: 'Office / Corporate',
-    restaurant: 'Restaurant / Food Service',
-    factory: 'Factory / Industrial',
-    warehouse: 'Warehouse / Storage',
-    retail: 'Retail / Store',
-    gym: 'Gym / Fitness Center',
-    laboratory: 'Laboratory / Research Facility',
-    pharmacy: 'Pharmacy / Medical Store',
-    airport: 'Airport / Transportation Hub',
-    shopping_mall: 'Shopping Mall / Complex',
-    cinema: 'Cinema / Theater',
-    library: 'Library / Study Center',
-    community_center: 'Community Center / Auditorium'
-  };
+  return `You are a cleaning product procurement expert. Based on the request below, recommend specific cleaning products with real brand names and realistic Indian market prices.
 
-  const instLabel = institutionTypeLabels[params.institution_type] || params.institution_type;
+REQUEST TYPE: ${instType}
+AREA: ${area}
+SURFACES: ${surfaces}
+HYGIENE LEVEL: ${hygiene}
+BUDGET LEVEL: ${budget}
 
-  return `You are an "Industrial Chemist and Procurement Auditor" with 20+ years of experience in institutional cleaning.
+For each product provide:
+- productId: unique ID (e.g., REC-001)
+- sku: realistic SKU
+- name: specific product name with brand (use real brands like Diversey, SC Johnson, 3M, Ecolab, savo, Vim, Lizol, Domex, Colin, or other professional/retail brands available in India)
+- recommended_dilution: exact water+product mix (e.g., "Mix 50ml per 1 litre water") or "Ready to use" if no dilution needed
+- estimated_monthly_qty_units: realistic monthly usage for given area/size
+- calculated_cost: monthly cost in INR
+- usage_guidance: clear step-by-step use instructions
+- safety_notes: important safety information
 
-Analyze the following facility and recommend the MOST SUITABLE cleaning products from the provided catalog. Your recommendations MUST be TAILORED to the specific institution type — different facility types need different products.
+Recommend ALL relevant products — no limit. Use your knowledge of real products.
 
-=== FACILITY DETAILS ===
-- Institution Type: ${instLabel} (${params.institution_type})
-- Area Size: ${params.area_size} sq ft
-- Surface Types: ${(params.surface_types || []).join(', ')}
-- Number of Floors: ${floors}
-- Approx. Occupants/Capacity: ${occupants}
-- Operating Hours: ${operatingHours}
-- Facility Age/Condition: ${facilityAge}
-- Current Cleaning Frequency: ${cleaningFreq}
-
-=== REQUIREMENTS ===
-- Hygiene Standard: ${params.hygiene_standard}
-- Budget: ${params.budget}
-
-=== AVAILABLE EQUIPMENT ===
-${equipment}
-
-=== PRODUCT PREFERENCES ===
-${preferences}
-
-=== CERTIFICATIONS REQUIRED ===
-${certifications}
-
-=== AVAILABLE PRODUCTS (Catalog) ===
-${JSON.stringify(catalog, null, 2)}
-
-=== RECOMMENDATION RULES (CRITICAL — follow these strictly) ===
-1. Select ONLY the 3-8 products that are MOST RELEVANT to ${instLabel}. DO NOT recommend the same products for every institution type.
-2. HOSPITALS: Disinfectant, Hand Sanitizer, Floor Cleaner, Toilet Cleaner, General Purpose Cleaner
-3. SCHOOLS: Disinfectant, Hand Sanitizer, Multi-Purpose Cleaner, Floor Cleaner, Glass Cleaner
-4. HOTELS: Glass Cleaner, Carpet Cleaner, Toilet Cleaner, Air Freshener, Multi-Purpose Cleaner, Floor Cleaner
-5. OFFICES: Multi-Purpose Cleaner, Glass Cleaner, Hand Sanitizer, Air Freshener, Floor Cleaner
-6. RESTAURANTS: Heavy Duty Degreaser, Disinfectant, Floor Cleaner, Toilet Cleaner, General Purpose Cleaner
-7. FACTORIES: Heavy Duty Degreaser, Floor Cleaner, Hand Sanitizer, Drain Cleaner, General Purpose Cleaner
-8. WAREHOUSES: Floor Cleaner, Multi-Purpose Cleaner, Heavy Duty Degreaser
-9. RETAIL: Glass Cleaner, Floor Cleaner, Multi-Purpose Cleaner, Air Freshener
-10. GYMS: Disinfectant, Multi-Purpose Cleaner, Floor Cleaner, Hand Sanitizer, Heavy Duty Degreaser
-11. LABORATORIES: Disinfectant, Floor Cleaner, Glass Cleaner, General Purpose Cleaner, Hand Sanitizer
-12. PHARMACIES: Disinfectant, Glass Cleaner, Floor Cleaner, Hand Sanitizer, General Purpose Cleaner
-13. AIRPORTS: Floor Cleaner, Glass Cleaner, Multi-Purpose Cleaner, Disinfectant, Air Freshener, Heavy Duty Degreaser
-14. SHOPPING MALLS: Floor Cleaner, Glass Cleaner, Multi-Purpose Cleaner, Air Freshener, Toilet Cleaner
-15. CINEMAS: Carpet Cleaner, Floor Cleaner, Multi-Purpose Cleaner, Air Freshener, Toilet Cleaner
-16. LIBRARIES: Multi-Purpose Cleaner, Floor Cleaner, Glass Cleaner, Air Freshener
-17. COMMUNITY CENTERS: Floor Cleaner, Multi-Purpose Cleaner, Disinfectant, Glass Cleaner, Hand Sanitizer
-18. Calculate quantities based on area size (${params.area_size} sq ft), surface types, hygiene level, and budget.
-19. Calculate cost as: quantity × unit price. Use the prices listed in the catalog.
-20. IMPORTANT: Use the EXACT product names from the catalog (without any brand prefixes).
-
-Respond with ONLY valid JSON in the following format:
-{
-  "recommendations": [
-    {
-      "productId": "string (must match one of the catalog product IDs exactly)",
-      "sku": "string",
-      "name": "string (exact catalog name)",
-      "recommended_dilution": "string",
-      "estimated_monthly_qty_units": 0,
-      "calculated_cost": 0,
-      "usage_guidance": "string",
-      "safety_notes": "string"
-    }
-  ],
-  "summary": {
-    "grossAggregatedCost": 0,
-    "financialStatusAlert": "string or null"
-  }
-}`;
+Respond ONLY with valid JSON:
+{"recommendations":[{"productId":"","sku":"","name":"","recommended_dilution":"","estimated_monthly_qty_units":0,"calculated_cost":0,"usage_guidance":"","safety_notes":""}],"summary":{"grossAggregatedCost":0,"financialStatusAlert":null}}`;
 }
 
 function getCatalogForPrompt() {
-  return [
-    { id: 'prod-gpc-001', sku: 'GPC-5L-001', name: 'Multi-Purpose Cleaner', price: 180, unit: '5L', surfaces: ['hard_floor', 'tile', 'countertop'], category: 'General Purpose Cleaner', hygiene_level: 'standard', tags: ['eco_friendly', 'concentrated', 'fragrance_free'] },
-    { id: 'prod-dsf-002', sku: 'HDS-5L-002', name: 'Hospital-Grade Disinfectant', price: 350, unit: '5L', surfaces: ['hard_floor', 'tile', 'stainless_steel', 'countertop'], category: 'Disinfectant', hygiene_level: 'medical_grade', tags: ['concentrated', 'industrial_grade'] },
-    { id: 'prod-gls-003', sku: 'GLS-5L-003', name: 'Glass & Surface Shine', price: 220, unit: '5L', surfaces: ['glass', 'mirror', 'stainless_steel'], category: 'Glass Cleaner', hygiene_level: 'standard', tags: ['ready_to_use', 'fragrance_free', 'hypoallergenic'] },
-    { id: 'prod-flr-004', sku: 'FLR-5L-004', name: 'Floor Shine Pro', price: 280, unit: '5L', surfaces: ['hard_floor', 'tile', 'marble'], category: 'Floor Cleaner', hygiene_level: 'high', tags: ['concentrated', 'eco_friendly'] },
-    { id: 'prod-crp-005', sku: 'CRP-5L-005', name: 'Carpet Cleaner Pro', price: 420, unit: '5L', surfaces: ['carpet'], category: 'Carpet Cleaner', hygiene_level: 'standard', tags: ['concentrated', 'fragrance_free'] },
-    { id: 'prod-stl-006', sku: 'STL-5L-006', name: 'Stainless Steel Polish', price: 380, unit: '5L', surfaces: ['stainless_steel'], category: 'Stainless Steel Polish', hygiene_level: 'standard', tags: ['ready_to_use', 'fragrance_free'] },
-    { id: 'prod-wpd-007', sku: 'WPD-5L-007', name: 'Wood Polish Premium', price: 450, unit: '5L', surfaces: ['wood'], category: 'Wood Polish', hygiene_level: 'standard', tags: ['ready_to_use', 'eco_friendly'] },
-    { id: 'prod-tlt-008', sku: 'TLT-5L-008', name: 'Toilet & Restroom Cleaner', price: 200, unit: '5L', surfaces: ['tile', 'porcelain'], category: 'Toilet Cleaner', hygiene_level: 'standard', tags: ['ready_to_use', 'fragrance_free'] },
-    { id: 'prod-hnd-009', sku: 'HND-5L-009', name: 'Hand Sanitizer Gel', price: 160, unit: '5L', surfaces: ['skin'], category: 'Hand Sanitizer', hygiene_level: 'high', tags: ['ready_to_use', 'fragrance_free', 'hypoallergenic'] },
-    { id: 'prod-hdd-010', sku: 'HDD-5L-010', name: 'Heavy Duty Degreaser', price: 320, unit: '5L', surfaces: ['hard_floor', 'stainless_steel', 'tile', 'countertop'], category: 'Heavy Duty Degreaser', hygiene_level: 'standard', tags: ['concentrated', 'industrial_grade'] },
-    { id: 'prod-bio-011', sku: 'BIO-5L-011', name: 'Bio-Enzymatic Drain Cleaner', price: 290, unit: '5L', surfaces: ['drain'], category: 'Drain Cleaner', hygiene_level: 'standard', tags: ['eco_friendly', 'ready_to_use', 'hypoallergenic'] },
-    { id: 'prod-air-012', sku: 'AIR-5L-012', name: 'Air Freshener Mist', price: 190, unit: '5L', surfaces: ['air'], category: 'Air Freshener', hygiene_level: 'standard', tags: ['ready_to_use', 'fragrance_free'] }
-  ];
+  // No hardcoded catalog — the AI generates products from its own knowledge
+  return [];
 }
 
 module.exports = {

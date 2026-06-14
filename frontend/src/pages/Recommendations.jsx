@@ -4,6 +4,9 @@ import { api, formatCurrency } from '../services/api';
 import ProductCard from '../components/ProductCard';
 import LoadingState from '../components/LoadingState';
 import ErrorState from '../components/ErrorState';
+import html2pdf from 'html2pdf.js';
+import { sendReportToEmail, isEmailJSConfigured } from '../services/emailService';
+import EmailJSConfigWarning from '../components/EmailJSConfigWarning';
 
 export default function Recommendations() {
   const { id } = useParams();
@@ -12,8 +15,13 @@ export default function Recommendations() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailAddress, setEmailAddress] = useState('');
   const [toast, setToast] = useState(null);
   const emailProcessedRef = useRef(false);
+  const contentRef = useRef(null);
 
   // Handle email result from location state (passed from RequirementForm)
   useEffect(() => {
@@ -63,6 +71,67 @@ export default function Recommendations() {
     });
   };
 
+  const handleDownloadPDF = async () => {
+    if (!contentRef.current || downloading) return;
+    setDownloading(true);
+    try {
+      const fileName = `quotation-${(data.institution_name || 'recommendation').replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}.pdf`;
+      const opt = {
+        margin: [10, 10, 10, 10],
+        filename: fileName,
+        image: { type: 'jpeg', quality: 0.95 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          letterRendering: true,
+          backgroundColor: '#0f172a',
+          logging: false
+        },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+      await html2pdf().set(opt).from(contentRef.current).save();
+      setToast({ type: 'success', message: 'PDF downloaded successfully!' });
+      setTimeout(() => setToast(null), 5000);
+    } catch (err) {
+      console.error('PDF generation failed:', err);
+      setToast({ type: 'error', message: 'Failed to generate PDF. Please try again.' });
+      setTimeout(() => setToast(null), 5000);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const handleSendEmail = async () => {
+    if (!emailAddress || !emailAddress.includes('@') || sendingEmail) return;
+    setSendingEmail(true);
+    try {
+      const result = await sendReportToEmail(
+        emailAddress,
+        data.institution_name || 'Valued Customer',
+        {
+          items: data.items,
+          total_estimated_cost: data.total_estimated_cost,
+          summary: data.summary,
+          alerts: data.alerts || [],
+          institution_name: data.institution_name,
+          institution_type: data.institution_type
+        }
+      );
+      if (result.success) {
+        setToast({ type: 'success', message: 'Quotation emailed successfully to ' + emailAddress });
+        setShowEmailModal(false);
+        setEmailAddress('');
+      } else {
+        setToast({ type: 'error', message: 'Failed to send email: ' + (result.error || 'Unknown error') });
+      }
+    } catch (err) {
+      setToast({ type: 'error', message: 'Failed to send email: ' + (err.message || 'Unknown error') });
+    } finally {
+      setSendingEmail(false);
+      setTimeout(() => setToast(null), 6000);
+    }
+  };
+
   const handleCopyAll = () => {
     if (!data?.items) return;
     const text = data.items.map(item =>
@@ -82,8 +151,8 @@ export default function Recommendations() {
   if (!data) return <ErrorState message="No recommendation data found" />;
 
   return (
-    <div className="animate-fade-in">
-      {/* Email Toast Notification */}
+    <>
+      {/* Email Toast Notification (outside contentRef so it doesn't appear in PDF) */}
       {toast && (
         <div className={`fixed top-20 right-4 sm:right-6 z-50 max-w-sm animate-slide-in-right transition-all duration-300 ${
           toast ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-8'
@@ -125,6 +194,8 @@ export default function Recommendations() {
         </div>
       )}
 
+      {/* Main content wrapped for PDF capture */}
+      <div className="animate-fade-in" ref={contentRef}>
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
         <div>
@@ -135,6 +206,18 @@ export default function Recommendations() {
           <p className="text-surface-400 mt-1">For <span className="text-surface-200 font-medium">{data.institution_name}</span></p>
         </div>
         <div className="flex gap-2 flex-wrap">
+          <button onClick={() => setShowEmailModal(true)} className="btn-accent text-sm">
+            <svg className="w-4 h-4 inline mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            Email Report
+          </button>
+          <button onClick={handleDownloadPDF} disabled={downloading} className="btn-primary text-sm">
+            <svg className="w-4 h-4 inline mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={downloading ? 'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15' : 'M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'} />
+            </svg>
+            {downloading ? 'Generating PDF...' : 'Download PDF'}
+          </button>
           <button onClick={handleCopyAll} className="btn-secondary text-sm">
             <svg className="w-4 h-4 inline mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={copied ? 'M5 13l4 4L19 7' : 'M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z'} />
@@ -143,6 +226,79 @@ export default function Recommendations() {
           </button>
         </div>
       </div>
+
+      {/* Email Modal Dialog */}
+      {showEmailModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowEmailModal(false)} onKeyDown={e => { if (e.key === 'Escape') setShowEmailModal(false); }} tabIndex={-1}>
+          <div className="absolute inset-0 bg-surface-900/80 backdrop-blur-sm" />
+          <div className="relative bg-surface-800 border border-surface-700 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-fade-in" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-semibold text-surface-100">Email Quotation</h3>
+              <button onClick={() => setShowEmailModal(false)} className="p-1.5 rounded-lg hover:bg-surface-700 transition-colors">
+                <svg className="w-5 h-5 text-surface-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {!isEmailJSConfigured() ? (
+              <div className="space-y-4">
+                <EmailJSConfigWarning inline />
+                <div className="flex justify-end">
+                  <button onClick={() => setShowEmailModal(false)} className="btn-secondary text-sm">
+                    Close
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-sm text-surface-400">
+                  Send the full quotation with product recommendations and cost summary to:
+                </p>
+                <div>
+                  <label className="block text-xs font-medium text-surface-400 mb-1.5">Email Address</label>
+                  <input
+                    type="email"
+                    value={emailAddress}
+                    onChange={e => setEmailAddress(e.target.value)}
+                    placeholder="recipient@example.com"
+                    autoFocus
+                    className="w-full px-4 py-2.5 bg-surface-700 border border-surface-600 rounded-xl text-surface-100 placeholder-surface-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 transition-colors text-sm"
+                    onKeyDown={e => { if (e.key === 'Enter' && emailAddress.includes('@') && !sendingEmail) handleSendEmail(); }}
+                  />
+                </div>
+                <div className="flex gap-3 justify-end">
+                  <button onClick={() => setShowEmailModal(false)} className="btn-secondary text-sm">
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSendEmail}
+                    disabled={!emailAddress.includes('@') || sendingEmail}
+                    className="btn-accent text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {sendingEmail ? (
+                      <>
+                        <svg className="animate-spin w-4 h-4 inline mr-1.5" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4 inline mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        Send Email
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -370,32 +526,70 @@ export default function Recommendations() {
             <thead>
               <tr className="border-b border-surface-700">
                 <th className="text-left py-3 px-3 text-surface-400 font-medium text-xs uppercase tracking-wider">Product</th>
+                <th className="text-left py-3 px-3 text-surface-400 font-medium text-xs uppercase tracking-wider">Dilution / Water</th>
                 <th className="text-right py-3 px-3 text-surface-400 font-medium text-xs uppercase tracking-wider">Qty/Month</th>
                 <th className="text-right py-3 px-3 text-surface-400 font-medium text-xs uppercase tracking-wider">Unit Price</th>
-                <th className="text-right py-3 px-3 text-surface-400 font-medium text-xs uppercase tracking-wider">Monthly Cost</th>
+                <th className="text-right py-3 px-3 text-surface-400 font-medium text-xs uppercase tracking-wider">Cost/Month</th>
               </tr>
             </thead>
             <tbody>
-              {data.items?.map((item, i) => (
-                <tr key={item.id || i} className="border-b border-surface-700/50 last:border-0">
-                  <td className="py-3 px-3 font-medium text-surface-200">{item.product_name}</td>
-                  <td className="text-right py-3 px-3 text-surface-300">{item.quantity_estimate} {item.unit || 'units'}</td>
-                  <td className="text-right py-3 px-3 text-surface-300">Rs {item.unit_price || item.base_price || 0}</td>
-                  <td className="text-right py-3 px-3 text-surface-100 font-semibold">Rs {Number(item.monthly_cost || 0).toLocaleString('en-IN')}</td>
-                </tr>
-              ))}
+              {data.items?.map((item, i) => {
+                const needsWater = item.dilution_ratio && 
+                  !item.dilution_ratio.toLowerCase().includes('ready to use') && 
+                  !item.dilution_ratio.toLowerCase().includes('no water');
+                return (
+                  <tr key={item.id || i} className="border-b border-surface-700/50 last:border-0 hover:bg-surface-700/30 transition-colors">
+                    <td className="py-3 px-3">
+                      <span className="font-medium text-surface-200">{item.product_name}</span>
+                    </td>
+                    <td className="py-3 px-3">
+                      <span className={`text-xs font-mono ${needsWater ? 'text-blue-400' : 'text-surface-400'}`}>
+                        {needsWater ? '💧 ' : '✓ '}
+                        {item.dilution_ratio || '-'}
+                      </span>
+                    </td>
+                    <td className="text-right py-3 px-3 text-surface-300 whitespace-nowrap">{item.quantity_estimate} {item.unit || 'units'}</td>
+                    <td className="text-right py-3 px-3 text-surface-300">Rs {item.unit_price || item.base_price || 0}</td>
+                    <td className="text-right py-3 px-3 text-surface-100 font-semibold whitespace-nowrap">Rs {Number(item.monthly_cost || 0).toLocaleString('en-IN')}</td>
+                  </tr>
+                );
+              })}
             </tbody>
             <tfoot>
               <tr className="border-t-2 border-surface-600">
-                <td className="py-3 px-3 font-semibold text-surface-200">Total</td>
-                <td className="text-right py-3 px-3 font-semibold text-surface-200">{data.monthly_total_quantity || 0} units</td>
+                <td className="py-3 px-3 font-semibold text-surface-200" colSpan="2">Total Monthly Estimate</td>
+                <td className="text-right py-3 px-3 font-semibold text-surface-200">{data.monthly_total_quantity || 0} {data.items?.[0]?.unit || 'units'}</td>
                 <td className="text-right py-3 px-3"></td>
                 <td className="text-right py-3 px-3 font-bold text-emerald-400">{formatCurrency(data.total_estimated_cost)}</td>
               </tr>
             </tfoot>
           </table>
         </div>
+
+        {/* Water Consumption Summary */}
+        {data.items?.some(item => item.dilution_ratio && 
+          !item.dilution_ratio.toLowerCase().includes('ready to use') && 
+          !item.dilution_ratio.toLowerCase().includes('no water')
+        ) && (
+          <div className="mt-5 p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-blue-300">💧 Water Usage Notice</p>
+                <p className="text-xs text-blue-200/70 mt-1">
+                  Some recommended products require water for dilution. Follow the specified dilution ratio for each product above. 
+                  For concentrates, mix the indicated amount of product with water before use. Ready-to-use (RTU) products require no additional water.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
+    </>
   );
 }

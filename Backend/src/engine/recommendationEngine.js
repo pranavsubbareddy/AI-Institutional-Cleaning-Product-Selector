@@ -3,124 +3,88 @@ const { v4: uuidv4 } = require('uuid');
 const PRODUCT_KNOWLEDGE_BASE = {
   products: [
     {
-      id: 'prod-gpc-001', name: 'Multi-Purpose Cleaner', category: 'General Purpose Cleaner',
-      surface_types: ['hard_floor', 'tile', 'countertop'], dilution_ratio: '1:40 (40ml per litre)',
-      unit: 'litre', unit_price: 180, coverage_per_unit: 40, hygiene_level: 'standard',
-      safety_notes: 'Wear gloves. Avoid contact with eyes. Keep away from children.',
-      usage_guidance: 'Dilute 40ml in 1 litre of water. Apply with mop or cloth. No rinsing required.',
-      tags: ['eco_friendly', 'concentrated', 'fragrance_free'],
-      equipment: ['mop', 'microfiber', 'scrubber', 'steam_cleaner'],
-      certifications_hint: 'green_seal'
+      id: 'prod-gpc-001', name: 'Ganga Multi-Purpose Cleaner', category: 'General Purpose Cleaner',
+      surface_types: ['hard_floor', 'tile', 'countertop', 'marble'], unit: 'litre', unit_price: 180,
+      coverage_per_unit: 40, dilution_ratio: 'Mix 50ml per 5L water', hygiene_level: 'standard',
+      safety_notes: 'Avoid contact with eyes. Use gloves for prolonged contact.',
+      usage_guidance: 'Apply diluted solution, wipe with clean cloth or mop.', equipment: ['mop', 'spray_bottle'], tags: ['eco_friendly']
     },
     {
-      id: 'prod-dsf-002', name: 'Hospital-Grade Disinfectant', category: 'Disinfectant',
-      surface_types: ['hard_floor', 'tile', 'stainless_steel', 'countertop'], dilution_ratio: '1:20 (50ml per litre)',
-      unit: 'litre', unit_price: 350, coverage_per_unit: 30, hygiene_level: 'medical_grade',
-      safety_notes: 'Wear gloves and mask. Ensure ventilation. Do not mix with other chemicals.',
-      usage_guidance: 'Dilute 50ml in 1 litre of water. Apply and leave for 5 minutes contact time. Rinse if required.',
-      tags: ['concentrated', 'industrial_grade'],
-      equipment: ['mop', 'microfiber', 'scrubber'],
-      certifications_hint: 'haccp'
+      id: 'prod-dsf-002', name: 'Ganga Hospital-Grade Disinfectant', category: 'Disinfectant',
+      surface_types: ['hard_floor', 'tile', 'countertop', 'stainless_steel', 'porcelain'], unit: 'litre', unit_price: 350,
+      coverage_per_unit: 30, dilution_ratio: 'Mix 20ml per 1L water', hygiene_level: 'medical_grade',
+      safety_notes: 'Use PPE. Ensure ventilation. Do not mix with bleach or ammonia.',
+      usage_guidance: 'Apply to surface, leave for 5-10 minutes contact time, then wipe.', equipment: ['spray_bottle', 'mop', 'auto_dispenser'], tags: ['hospital_grade']
     },
     {
-      id: 'prod-gls-003', name: 'Glass & Surface Shine', category: 'Glass Cleaner',
-      surface_types: ['glass', 'mirror', 'stainless_steel'], dilution_ratio: 'Ready to use',
-      unit: 'litre', unit_price: 220, coverage_per_unit: 50, hygiene_level: 'standard',
-      safety_notes: 'Spray in well-ventilated area. Avoid spraying on electronics.',
-      usage_guidance: 'Spray directly on surface. Wipe with clean microfiber cloth. Buff for shine.',
-      tags: ['ready_to_use', 'fragrance_free', 'hypoallergenic'],
-      equipment: ['microfiber'],
-      certifications_hint: 'green_seal'
+      id: 'prod-gls-003', name: 'Ganga Glass & Surface Shine', category: 'Glass Cleaner',
+      surface_types: ['glass', 'mirror', 'stainless_steel'], unit: 'litre', unit_price: 220,
+      coverage_per_unit: 50, dilution_ratio: 'Ready to use', hygiene_level: 'standard',
+      safety_notes: 'Avoid spraying near electrical outlets. Keep away from children.',
+      usage_guidance: 'Spray directly onto surface, wipe with microfiber cloth for streak-free finish.', equipment: ['spray_bottle', 'squeegee'], tags: []
     },
     {
-      id: 'prod-flr-004', name: 'Floor Shine Pro', category: 'Floor Cleaner',
-      surface_types: ['hard_floor', 'tile', 'marble'], dilution_ratio: '1:30 (33ml per litre)',
-      unit: 'litre', unit_price: 280, coverage_per_unit: 35, hygiene_level: 'standard',
-      safety_notes: 'May make floor slippery. Use caution signs during cleaning.',
-      usage_guidance: 'Dilute 33ml in 1 litre of water. Mop floor. Allow to air dry.',
-      tags: ['concentrated', 'eco_friendly'],
-      equipment: ['mop', 'scrubber', 'pressure_washer'],
-      certifications_hint: 'iso_14001'
+      id: 'prod-flr-004', name: 'Ganga Floor Shine Pro', category: 'Floor Cleaner',
+      surface_types: ['hard_floor', 'tile', 'marble', 'wood'], unit: 'litre', unit_price: 280,
+      coverage_per_unit: 35, dilution_ratio: 'Mix 30ml per 5L water', hygiene_level: 'standard',
+      safety_notes: 'May make floors slippery when wet. Use wet floor signs.',
+      usage_guidance: 'Dilute in mop bucket, mop floor evenly. No rinsing required.', equipment: ['mop', 'scrubber'], tags: []
     },
     {
-      id: 'prod-crp-005', name: 'Carpet Cleaner Pro', category: 'Carpet Cleaner',
-      surface_types: ['carpet'], dilution_ratio: '1:15 (65ml per litre)',
-      unit: 'litre', unit_price: 420, coverage_per_unit: 20, hygiene_level: 'standard',
+      id: 'prod-crp-005', name: 'Ganga Carpet Fresh', category: 'Carpet Cleaner',
+      surface_types: ['carpet'], unit: 'litre', unit_price: 420,
+      coverage_per_unit: 25, dilution_ratio: 'Mix 40ml per 1L water', hygiene_level: 'standard',
       safety_notes: 'Test on inconspicuous area first. Ensure carpet dries completely.',
-      usage_guidance: 'Dilute 65ml in 1 litre of warm water. Apply with carpet brush or machine. Extract and dry.',
-      tags: ['concentrated', 'fragrance_free'],
-      equipment: ['vacuum', 'carpet_extractor'],
-      certifications_hint: null
+      usage_guidance: 'Apply with carpet shampoo machine or by hand. Agitate and extract.', equipment: ['carpet_cleaner', 'vacuum'], tags: []
     },
     {
-      id: 'prod-stl-006', name: 'Stainless Steel Polish', category: 'Stainless Steel Polish',
-      surface_types: ['stainless_steel'], dilution_ratio: 'Ready to use',
-      unit: 'litre', unit_price: 380, coverage_per_unit: 60, hygiene_level: 'standard',
-      safety_notes: 'Flammable. Keep away from heat sources. Use in ventilated area.',
-      usage_guidance: 'Apply small amount on soft cloth. Rub in direction of grain. Buff to shine.',
-      tags: ['ready_to_use', 'fragrance_free'],
-      equipment: ['microfiber'],
-      certifications_hint: null
+      id: 'prod-stl-006', name: 'Ganga Stainless Steel Polish', category: 'Stainless Steel Polish',
+      surface_types: ['stainless_steel'], unit: 'litre', unit_price: 380,
+      coverage_per_unit: 45, dilution_ratio: 'Ready to use', hygiene_level: 'standard',
+      safety_notes: 'Use in well-ventilated area. Flammable - keep away from heat sources.',
+      usage_guidance: 'Apply small amount onto soft cloth, rub in direction of grain.', equipment: ['cloth'], tags: []
     },
     {
-      id: 'prod-wpd-007', name: 'Wood Polish Premium', category: 'Wood Polish',
-      surface_types: ['wood'], dilution_ratio: 'Ready to use',
-      unit: 'litre', unit_price: 450, coverage_per_unit: 55, hygiene_level: 'standard',
-      safety_notes: 'Flammable. Keep away from open flames. Use gloves.',
-      usage_guidance: 'Shake well. Apply with soft cloth in circular motions. Buff after 5 minutes.',
-      tags: ['ready_to_use', 'eco_friendly'],
-      equipment: ['microfiber'],
-      certifications_hint: null
+      id: 'prod-wpd-007', name: 'Ganga Wood Polish Premium', category: 'Wood Polish',
+      surface_types: ['wood'], unit: 'litre', unit_price: 450,
+      coverage_per_unit: 40, dilution_ratio: 'Ready to use', hygiene_level: 'standard',
+      safety_notes: 'Flammable. Keep away from open flames. Store in cool dry place.',
+      usage_guidance: 'Shake well. Apply with soft cloth using circular motions. Buff for shine.', equipment: ['cloth'], tags: ['premium']
     },
     {
-      id: 'prod-tlt-008', name: 'Toilet & Restroom Cleaner', category: 'Toilet Cleaner',
-      surface_types: ['tile', 'porcelain'], dilution_ratio: 'Ready to use',
-      unit: 'litre', unit_price: 200, coverage_per_unit: 25, hygiene_level: 'standard',
+      id: 'prod-tlt-008', name: 'Ganga Toilet & Restroom Cleaner', category: 'Toilet Cleaner',
+      surface_types: ['porcelain', 'tile', 'stainless_steel'], unit: 'litre', unit_price: 200,
+      coverage_per_unit: 30, dilution_ratio: 'Ready to use or mix 50ml per 1L water', hygiene_level: 'standard',
       safety_notes: 'Do not mix with bleach or acidic cleaners. Use gloves.',
-      usage_guidance: 'Apply directly under rim and on surfaces. Let sit for 5 minutes. Scrub and flush.',
-      tags: ['ready_to_use', 'fragrance_free'],
-      equipment: ['mop', 'microfiber'],
-      certifications_hint: null
+      usage_guidance: 'Apply to toilet bowl and surfaces, scrub with brush, flush and rinse.', equipment: ['brush', 'spray_bottle'], tags: []
     },
     {
-      id: 'prod-hnd-009', name: 'Hand Sanitizer Gel', category: 'Hand Sanitizer',
-      surface_types: ['skin'], dilution_ratio: 'Ready to use',
-      unit: 'litre', unit_price: 160, coverage_per_unit: 100, hygiene_level: 'high',
-      safety_notes: 'For external use only. Flammable. Keep away from children.',
-      usage_guidance: 'Apply small amount on palm. Rub hands together until dry.',
-      tags: ['ready_to_use', 'fragrance_free', 'hypoallergenic'],
-      equipment: ['auto_dispenser'],
-      certifications_hint: 'osha'
+      id: 'prod-hnd-009', name: 'Ganga Hand Sanitizer Gel', category: 'Hand Sanitizer',
+      surface_types: ['countertop'], unit: 'litre', unit_price: 160,
+      coverage_per_unit: 100, dilution_ratio: 'Ready to use', hygiene_level: 'high',
+      safety_notes: 'For external use only. Keep away from eyes. Contains 70% alcohol.',
+      usage_guidance: 'Apply 3-5ml to dry hands, rub thoroughly until dry.', equipment: ['auto_dispenser', 'pump_bottle'], tags: []
     },
     {
-      id: 'prod-hdd-010', name: 'Heavy Duty Degreaser', category: 'Heavy Duty Degreaser',
-      surface_types: ['hard_floor', 'stainless_steel', 'tile', 'countertop'], dilution_ratio: '1:10 (100ml per litre)',
-      unit: 'litre', unit_price: 320, coverage_per_unit: 15, hygiene_level: 'standard',
-      safety_notes: 'Wear protective gloves and goggles. Avoid prolonged skin contact.',
-      usage_guidance: 'Dilute 100ml in 1 litre of water. Apply and scrub. Rinse thoroughly with water.',
-      tags: ['concentrated', 'industrial_grade'],
-      equipment: ['mop', 'scrubber', 'pressure_washer', 'steam_cleaner'],
-      certifications_hint: 'haccp'
+      id: 'prod-hdd-010', name: 'Ganga Heavy Duty Degreaser', category: 'Heavy Duty Degreaser',
+      surface_types: ['stainless_steel', 'hard_floor', 'tile', 'countertop'], unit: 'litre', unit_price: 320,
+      coverage_per_unit: 20, dilution_ratio: 'Mix 40ml per 1L water', hygiene_level: 'standard',
+      safety_notes: 'Use gloves and eye protection. Avoid prolonged skin contact.',
+      usage_guidance: 'Apply to greasy surfaces, agitate with brush or scrubber, rinse with water.', equipment: ['scrubber', 'pressure_washer', 'brush'], tags: []
     },
     {
-      id: 'prod-bio-011', name: 'Bio-Enzymatic Drain Cleaner', category: 'Drain Cleaner',
-      surface_types: ['drain'], dilution_ratio: 'Ready to use',
-      unit: 'litre', unit_price: 290, coverage_per_unit: 10, hygiene_level: 'standard',
-      safety_notes: 'Non-toxic and biodegradable. Safe for septic systems.',
-      usage_guidance: 'Pour 250ml down drain weekly. Let sit overnight for best results.',
-      tags: ['eco_friendly', 'ready_to_use', 'hypoallergenic'],
-      equipment: [],
-      certifications_hint: 'green_seal'
+      id: 'prod-bio-011', name: 'Ganga Bio-Enzymatic Drain Cleaner', category: 'Drain Cleaner',
+      surface_types: ['drain'], unit: 'litre', unit_price: 290,
+      coverage_per_unit: 15, dilution_ratio: 'Ready to use', hygiene_level: 'standard',
+      safety_notes: 'Non-toxic, safe for pipes. Avoid contact with eyes.',
+      usage_guidance: 'Pour 100-200ml directly into drain weekly. Let sit overnight for best results.', equipment: [], tags: ['eco_friendly', 'enzyme_based']
     },
     {
-      id: 'prod-air-012', name: 'Air Freshener Mist', category: 'Air Freshener',
-      surface_types: ['air'], dilution_ratio: 'Ready to use',
-      unit: 'litre', unit_price: 190, coverage_per_unit: 80, hygiene_level: 'standard',
-      safety_notes: 'Pressurized container. Do not puncture. Keep away from heat.',
-      usage_guidance: 'Spray 2-3 times in room as needed. Reapply every 4-6 hours.',
-      tags: ['ready_to_use', 'fragrance_free'],
-      equipment: [],
-      certifications_hint: null
+      id: 'prod-air-012', name: 'Ganga Air Freshener Mist', category: 'Air Freshener',
+      surface_types: ['air'], unit: 'litre', unit_price: 190,
+      coverage_per_unit: 120, dilution_ratio: 'Ready to use', hygiene_level: 'standard',
+      safety_notes: 'Do not spray near eyes or face. Use in well-ventilated areas.',
+      usage_guidance: 'Spray 2-3 pumps in center of room. Reapply as needed for continuous freshness.', equipment: ['spray_bottle', 'auto_dispenser'], tags: []
     }
   ],
 

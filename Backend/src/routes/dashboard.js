@@ -1,32 +1,39 @@
 const express = require('express');
 const router = express.Router();
 const { queryAll } = require('../database/schema');
+const { requireAuth } = require('../middleware/auth');
+
+// All dashboard routes require authentication
+router.use(requireAuth);
 
 // ---------------------------------------------------------------------------
-// GET /api/dashboard/stats — detailed stats for the dashboard view
+// GET /api/dashboard/stats — detailed stats scoped to the authenticated user
 // ---------------------------------------------------------------------------
 router.get('/stats', async (req, res, next) => {
   try {
+    const uid = req.user.uid;
+
     const [instCount, recCount, prodCount, ordCount] = await Promise.all([
-      queryAll('SELECT COUNT(*) as count FROM institutions'),
-      queryAll('SELECT COUNT(*) as count FROM recommendations'),
+      queryAll('SELECT COUNT(*) as count FROM institutions WHERE user_id = ?', [uid]),
+      queryAll('SELECT COUNT(*) as count FROM recommendations r JOIN institutions i ON r.institution_id = i.id WHERE i.user_id = ?', [uid]),
       queryAll('SELECT COUNT(*) as count FROM products'),
       queryAll('SELECT COUNT(*) as count FROM orders')
     ]);
 
     const [institutionsByType, recommendationsByStatus, costResult, recentRecommendations, hygieneStats, budgetStats, activeRecs] = await Promise.all([
-      queryAll('SELECT institution_type, COUNT(*) as count FROM institutions GROUP BY institution_type ORDER BY count DESC'),
-      queryAll('SELECT status, COUNT(*) as count FROM recommendations GROUP BY status'),
-      queryAll("SELECT COALESCE(SUM(total_estimated_cost), 0) as total FROM recommendations WHERE status = 'Processed'"),
+      queryAll('SELECT institution_type, COUNT(*) as count FROM institutions WHERE user_id = ? GROUP BY institution_type ORDER BY count DESC', [uid]),
+      queryAll('SELECT r.status, COUNT(*) as count FROM recommendations r JOIN institutions i ON r.institution_id = i.id WHERE i.user_id = ? GROUP BY r.status', [uid]),
+      queryAll("SELECT COALESCE(SUM(r.total_estimated_cost), 0) as total FROM recommendations r JOIN institutions i ON r.institution_id = i.id WHERE r.status = 'Processed' AND i.user_id = ?", [uid]),
       queryAll(`SELECT r.id, r.total_estimated_cost, r.created_at, r.status, r.source, r.owner,
               i.name as institution_name, i.institution_type
        FROM recommendations r
        JOIN institutions i ON r.institution_id = i.id
+       WHERE i.user_id = ?
        ORDER BY r.created_at DESC
-       LIMIT 10`),
-      queryAll('SELECT hygiene_standard, COUNT(*) as count FROM institutions GROUP BY hygiene_standard'),
-      queryAll('SELECT budget, COUNT(*) as count FROM institutions GROUP BY budget'),
-      queryAll("SELECT COUNT(*) as count FROM recommendations WHERE status IN ('Processed', 'Pending_AI')")
+       LIMIT 10`, [uid]),
+      queryAll('SELECT hygiene_standard, COUNT(*) as count FROM institutions WHERE user_id = ? GROUP BY hygiene_standard', [uid]),
+      queryAll('SELECT budget, COUNT(*) as count FROM institutions WHERE user_id = ? GROUP BY budget', [uid]),
+      queryAll("SELECT COUNT(*) as count FROM recommendations r JOIN institutions i ON r.institution_id = i.id WHERE r.status IN ('Processed', 'Pending_AI') AND i.user_id = ?", [uid])
     ]);
 
     const totalEstimatedCost = costResult[0]?.total || 0;
@@ -56,29 +63,29 @@ router.get('/stats', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
-// GET /api/dashboard/summary — lean aggregated metrics for top-level view
-// Returns: total profiles, total calculated volume (INR), active recs count,
-//          and a list of history logs (last 20)
+// GET /api/dashboard/summary — lean aggregated metrics for this user
 // ---------------------------------------------------------------------------
 router.get('/summary', async (req, res, next) => {
   try {
+    const uid = req.user.uid;
+
     const [totalProfiles, volumeResult, activeResult, historyLogs] = await Promise.all([
-      queryAll('SELECT COUNT(*) as count FROM institutions'),
-      queryAll("SELECT COALESCE(SUM(total_estimated_cost), 0) as total_volume FROM recommendations WHERE status = 'Processed'"),
-      queryAll("SELECT COUNT(*) as count FROM recommendations WHERE status IN ('Processed', 'Pending_AI', 'Draft')"),
+      queryAll('SELECT COUNT(*) as count FROM institutions WHERE user_id = ?', [uid]),
+      queryAll("SELECT COALESCE(SUM(r.total_estimated_cost), 0) as total_volume FROM recommendations r JOIN institutions i ON r.institution_id = i.id WHERE r.status = 'Processed' AND i.user_id = ?", [uid]),
+      queryAll("SELECT COUNT(*) as count FROM recommendations r JOIN institutions i ON r.institution_id = i.id WHERE r.status IN ('Processed', 'Pending_AI', 'Draft') AND i.user_id = ?", [uid]),
       queryAll(`SELECT r.id, r.total_estimated_cost, r.created_at, r.status, r.source, r.owner,
               r.institution_id, i.name as institution_name, i.institution_type
        FROM recommendations r
        JOIN institutions i ON r.institution_id = i.id
+       WHERE i.user_id = ?
        ORDER BY r.created_at DESC
-       LIMIT 20`)
+       LIMIT 20`, [uid])
     ]);
 
     const totalProfilesCount = totalProfiles[0]?.count || 0;
     const totalVolumeInr = volumeResult[0]?.total_volume || 0;
     const activeRecommendations = activeResult[0]?.count || 0;
 
-    // Format history logs cleanly
     const formattedLogs = historyLogs.map(log => ({
       id: log.id,
       institution_id: log.institution_id,
@@ -108,10 +115,12 @@ router.get('/summary', async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
-// GET /api/dashboard/institutions — full institution list for dashboard tables
+// GET /api/dashboard/institutions — full institution list for this user
 // ---------------------------------------------------------------------------
 router.get('/institutions', async (req, res, next) => {
   try {
+    const uid = req.user.uid;
+
     const institutions = await queryAll(
       `SELECT i.*,
               (SELECT COUNT(*) FROM recommendations WHERE institution_id = i.id) as recommendation_count,
@@ -119,7 +128,9 @@ router.get('/institutions', async (req, res, next) => {
               (SELECT status FROM recommendations WHERE institution_id = i.id ORDER BY created_at DESC LIMIT 1) as latest_status,
               (SELECT created_at FROM recommendations WHERE institution_id = i.id ORDER BY created_at DESC LIMIT 1) as latest_recommendation_date
        FROM institutions i
-       ORDER BY i.created_at DESC`
+       WHERE i.user_id = ?
+       ORDER BY i.created_at DESC`,
+      [uid]
     );
 
     const parsed = institutions.map(inst => ({

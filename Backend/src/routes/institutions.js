@@ -3,14 +3,20 @@ const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const { queryAll, queryOne, run } = require('../database/schema');
 const { validateInstitutionInput, validatePagination } = require('../middleware/validation');
+const { requireAuth } = require('../middleware/auth');
+
+// All institution routes require authentication
+router.use(requireAuth);
 
 router.post('/', validateInstitutionInput, async (req, res) => {
   try {
     const id = uuidv4();
     const { name, institution_type, area_size, surface_types, hygiene_standard, budget, contact_name, contact_email, contact_phone, address, metadata } = req.body;
 
-    await run('INSERT INTO institutions (id, name, institution_type, area_size, surface_types, hygiene_standard, budget, contact_name, contact_email, contact_phone, address, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [id, name, institution_type, area_size, JSON.stringify(surface_types), hygiene_standard, budget, contact_name || null, contact_email || null, contact_phone || null, address || null, metadata ? JSON.stringify(metadata) : null]);
+    await run(
+      'INSERT INTO institutions (id, name, institution_type, area_size, surface_types, hygiene_standard, budget, contact_name, contact_email, contact_phone, address, metadata, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, name, institution_type, area_size, JSON.stringify(surface_types), hygiene_standard, budget, contact_name || null, contact_email || null, contact_phone || null, address || null, metadata ? JSON.stringify(metadata) : null, req.user.uid]
+    );
 
     const institution = await queryOne('SELECT * FROM institutions WHERE id = ?', [id]);
     institution.surface_types = JSON.parse(institution.surface_types || '[]');
@@ -37,15 +43,15 @@ router.get('/', validatePagination, async (req, res) => {
     const { page, limit, status, type } = req.query;
     const offset = (page - 1) * limit;
 
-    let sql = 'SELECT * FROM institutions WHERE 1=1';
-    const params = [];
+    let sql = 'SELECT * FROM institutions WHERE user_id = ?';
+    const params = [req.user.uid];
 
     if (status) { sql += ' AND status = ?'; params.push(status); }
     if (type) { sql += ' AND institution_type = ?'; params.push(type); }
 
     // Count query with filters
-    let countSql = 'SELECT COUNT(*) as total FROM institutions WHERE 1=1';
-    const countParams = [];
+    let countSql = 'SELECT COUNT(*) as total FROM institutions WHERE user_id = ?';
+    const countParams = [req.user.uid];
     if (status) { countSql += ' AND status = ?'; countParams.push(status); }
     if (type) { countSql += ' AND institution_type = ?'; countParams.push(type); }
     const countResult = await queryAll(countSql, countParams);
@@ -82,7 +88,7 @@ router.get('/', validatePagination, async (req, res) => {
 
 router.get('/:id', async (req, res) => {
   try {
-    const institution = await queryOne('SELECT * FROM institutions WHERE id = ?', [req.params.id]);
+    const institution = await queryOne('SELECT * FROM institutions WHERE id = ? AND user_id = ?', [req.params.id, req.user.uid]);
     if (!institution) {
       return res.status(404).json({
         success: false,
@@ -111,7 +117,7 @@ router.get('/:id', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   try {
-    const existing = await queryOne('SELECT * FROM institutions WHERE id = ?', [req.params.id]);
+    const existing = await queryOne('SELECT * FROM institutions WHERE id = ? AND user_id = ?', [req.params.id, req.user.uid]);
     if (!existing) {
       return res.status(404).json({
         success: false,
@@ -141,7 +147,7 @@ router.put('/:id', async (req, res) => {
     if (updates.length > 0) {
       updates.push('updated_at = NOW()');
       params.push(req.params.id);
-      await run('UPDATE institutions SET ' + updates.join(', ') + ' WHERE id = ?', params);
+      await run('UPDATE institutions SET ' + updates.join(', ') + ' WHERE id = ? AND user_id = ?', [...params, req.user.uid]);
     }
 
     const updated = await queryOne('SELECT * FROM institutions WHERE id = ?', [req.params.id]);
@@ -166,7 +172,7 @@ router.put('/:id', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   try {
-    const existing = await queryOne('SELECT * FROM institutions WHERE id = ?', [req.params.id]);
+    const existing = await queryOne('SELECT * FROM institutions WHERE id = ? AND user_id = ?', [req.params.id, req.user.uid]);
     if (!existing) {
       return res.status(404).json({
         success: false,
@@ -174,7 +180,7 @@ router.delete('/:id', async (req, res) => {
         timestamp: new Date().toISOString()
       });
     }
-    await run('DELETE FROM institutions WHERE id = ?', [req.params.id]);
+    await run('DELETE FROM institutions WHERE id = ? AND user_id = ?', [req.params.id, req.user.uid]);
     res.json({
       success: true,
       message: 'Institution deleted successfully',

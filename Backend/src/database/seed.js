@@ -1,5 +1,7 @@
 require('dotenv').config();
 
+const bcrypt = require('bcryptjs');
+const { v4: uuidv4 } = require('uuid');
 const { initializeSchema, run, queryAll } = require('./schema');
 const { PRODUCT_KNOWLEDGE_BASE } = require('../engine/recommendationEngine');
 
@@ -119,6 +121,20 @@ async function seedDatabase() {
     );
   }
   console.log('  ' + msdsDocs.length + ' MSDS documents seeded');
+
+  // ── Seed default user ─────────────────────────────────────────────────────
+  const users = await queryAll('SELECT COUNT(*) as count FROM users');
+  if (users.length === 0 || users[0].count === 0) {
+    const hashedPassword = await bcrypt.hash('pranav@123', 10);
+    await run(
+      `INSERT INTO users (uid, email, passwordHash, displayName, phone, age, gender, photoURL, provider, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ['user_' + uuidv4(), 'pranavsubbareddy11@gmail.com', hashedPassword, 'Pranav', '', null, '', null, 'password', new Date().toISOString()]
+    );
+    console.log('  1 default user seeded: pranavsubbareddy11@gmail.com');
+  } else {
+    console.log('  Users table already has data — skipping user seed');
+  }
 
   console.log('\n Database seeding complete!');
 }

@@ -6,11 +6,6 @@ function validateInstitutionInput(req, res, next) {
     errors.push('Institution name is required (min 2 characters)');
   }
 
-  const validTypes = ['hospital', 'school', 'hotel', 'office', 'restaurant', 'factory', 'warehouse', 'retail', 'gym', 'laboratory', 'pharmacy', 'airport', 'shopping_mall', 'cinema', 'library', 'community_center'];
-  if (!institution_type || !validTypes.includes(institution_type)) {
-    errors.push(`Institution type must be one of: ${validTypes.join(', ')}`);
-  }
-
   if (area_size === undefined || area_size === null || isNaN(Number(area_size)) || Number(area_size) <= 0) {
     errors.push('Area size must be a positive number');
   }

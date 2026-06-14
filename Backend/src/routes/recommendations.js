@@ -6,6 +6,10 @@ const { queryAll, queryOne, run } = require('../database/schema');
 const { generateRecommendations } = require('../engine/geminiService');
 const { generateRecommendation } = require('../engine/recommendationEngine');
 const { MOCK_PRODUCT_CATALOG } = require('../engine/productCatalog');
+const { requireAuth } = require('../middleware/auth');
+
+// All recommendation routes require authentication
+router.use(requireAuth);
 
 // ---------------------------------------------------------------------------
 // Allowed enums for validation
@@ -69,6 +73,60 @@ const validateProcessBody = [
 ];
 
 // ---------------------------------------------------------------------------
+// Helper: ensure a product exists in the products table before creating
+// recommendation_items that reference it. This avoids FK constraint failures
+// when AI generates dynamic product IDs that don't exist yet.
+// ---------------------------------------------------------------------------
+async function ensureProductExists(productId, productSku, productData = {}) {
+  // Check if already exists by id or sku
+  let existing = null;
+  if (productId) {
+    existing = await queryOne('SELECT id FROM products WHERE id = ?', [productId]);
+  }
+  if (!existing && productSku) {
+    existing = await queryOne('SELECT id FROM products WHERE sku = ?', [productSku]);
+  }
+
+  if (existing) {
+    return existing.id;
+  }
+
+  // Insert the product dynamically
+  const finalId = productId || uuidv4();
+  const name = productData.name || productData.product_name || 'AI-Generated Product';
+  const category = productData.category || 'General';
+  const unitPrice = productData.unit_price || productData.calculated_cost || 0;
+  const unit = productData.unit || 'litre';
+  const dilutionRatio = productData.dilution_ratio || productData.recommended_dilution || null;
+  const coveragePerUnit = productData.coverage_per_unit || 0;
+  const usageGuidance = productData.usage_guidance || null;
+  const safetyNotes = productData.safety_notes || null;
+
+  try {
+    await run(
+      `INSERT INTO products (id, sku, name, description, category, surface_types, dilution_ratio, unit, unit_price, coverage_per_unit, safety_notes, usage_guidance, hygiene_level)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        finalId, productSku || finalId, name,
+        `${category} cleaning product - AI generated`,
+        category, '[]', dilutionRatio,
+        unit, Number(unitPrice), Number(coveragePerUnit),
+        safetyNotes, usageGuidance, 'standard'
+      ]
+    );
+    console.log(`  [DB] Dynamically inserted product "${name}" with id=${finalId}`);
+  } catch (insertErr) {
+    // Race condition or duplicate — check if it was inserted by another request
+    const retry = await queryOne('SELECT id FROM products WHERE id = ? OR sku = ?', [finalId, productSku || finalId]);
+    if (retry) {
+      return retry.id;
+    }
+    throw insertErr;
+  }
+  return finalId;
+}
+
+// ---------------------------------------------------------------------------
 // POST /api/recommendations/process
 // Supports TWO modes:
 //   1. Direct form submission: { institutionType, areaSize, surfaceTypes, ... }
@@ -91,7 +149,7 @@ router.post('/process', validateProcessBody, async (req, res, next) => {
 
     // --- MODE 1: Institution ID provided (backward compatible) ---
     if (institutionId) {
-      institution = await queryOne('SELECT * FROM institutions WHERE id = ?', [institutionId]);
+      institution = await queryOne('SELECT * FROM institutions WHERE id = ? AND user_id = ?', [institutionId, req.user.uid]);
       if (!institution) {
         return res.status(404).json({
           success: false,
@@ -108,12 +166,12 @@ router.post('/process', validateProcessBody, async (req, res, next) => {
       const instName = facilityName || `${institutionType}-${Date.now()}`;
 
       await run(
-        `INSERT INTO institutions (id, name, institution_type, area_size, surface_types, hygiene_standard, budget, contact_name, contact_email, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')`,
+        `INSERT INTO institutions (id, name, institution_type, area_size, surface_types, hygiene_standard, budget, contact_name, contact_email, status, user_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)`,
         [
           newId, instName, institutionType, Number(areaSize),
           JSON.stringify(surfaceTypes), hygieneStandard || 'standard',
-          budget || 'medium', contactName || null, contactEmail || null
+          budget || 'medium', contactName || null, contactEmail || null, req.user.uid
         ]
       );
 
@@ -155,10 +213,6 @@ router.post('/process', validateProcessBody, async (req, res, next) => {
         console.warn('[recommendations] productCatalog not available for SKU fallback');
       }
 
-      const allProducts = await queryAll('SELECT id, COALESCE(sku, id) as identifier FROM products');
-      const productIdByIdentifier = {};
-      allProducts.forEach(p => { productIdByIdentifier[p.identifier] = p.id; });
-
       // Save recommendation record
       const ruleRecId = uuidv4();
       const ruleAlerts = ruleResult.alerts || [];
@@ -179,11 +233,24 @@ router.post('/process', validateProcessBody, async (req, res, next) => {
         ]
       );
 
-      // Save recommendation line items
+      // Save recommendation line items — ensure products exist first
       await Promise.all(ruleResult.items.map(async (item) => {
         const lineId = uuidv4();
         const pid = item.product_id || '';
-        const productId = productIdByIdentifier[pid] || pid;
+        const productId = await ensureProductExists(
+          null,
+          pid,
+          {
+            name: item.product_name,
+            category: item.category,
+            unit_price: item.unit_price,
+            unit: item.unit,
+            dilution_ratio: item.dilution_ratio,
+            coverage_per_unit: item.coverage_per_unit,
+            usage_guidance: item.usage_guidance,
+            safety_notes: item.safety_notes
+          }
+        );
         await run(
           `INSERT INTO recommendation_items
            (id, recommendation_id, product_id, quantity_estimate, dilution_ratio,
@@ -282,32 +349,27 @@ router.post('/process', validateProcessBody, async (req, res, next) => {
     );
 
     // --- Save recommendation line items ---
-    // Build SKU lookups from DB products and hardcoded catalog for fallback
-    const catalogBySku = {};
-    try {
-      MOCK_PRODUCT_CATALOG.forEach(p => { catalogBySku[p.sku] = p; });
-    } catch (e) {
-      console.warn('[recommendations] productCatalog not available for SKU fallback');
-    }
-
-    // Build aiResult lookups by SKU for robust fallback matching
-    const aiResultBySku = {};
-    aiResult.recommendations.forEach(r => {
-      const pid = r.productId || r.product_id || r.sku || '';
-      if (pid) aiResultBySku[pid] = r;
-    });
-
-    // Fetch actual products from DB to map SKUs/product IDs -> DB UUIDs
-    const allProducts = await queryAll('SELECT id, COALESCE(sku, id) as identifier FROM products');
-    const productIdByIdentifier = {};
-    allProducts.forEach(p => { productIdByIdentifier[p.identifier] = p.id; });
-
+    // Ensure all AI-generated products exist in the products table (FK requirement)
+    // then insert recommendation items
     // Use Promise.all to insert all recommendation items in parallel
     await Promise.all(aiResult.recommendations.map(async (item) => {
       const lineId = uuidv4();
-      const pid = item.productId || item.product_id || item.sku || '';
-      // Prefer DB product UUID; fallback to using the product ID as-is
-      const productId = productIdByIdentifier[pid] || pid;
+      const pid = item.productId || item.product_id || '';
+      const sku = item.sku || '';
+      const productId = await ensureProductExists(
+        pid || null,
+        sku || null,
+        {
+          name: item.name,
+          category: item.category,
+          unit_price: item.unit_price || item.calculated_cost,
+          unit: 'litre',
+          dilution_ratio: item.recommended_dilution,
+          coverage_per_unit: 0,
+          usage_guidance: item.usage_guidance,
+          safety_notes: item.safety_notes
+        }
+      );
       await run(
         `INSERT INTO recommendation_items
          (id, recommendation_id, product_id, quantity_estimate, dilution_ratio,
@@ -322,6 +384,21 @@ router.post('/process', validateProcessBody, async (req, res, next) => {
         ]
       );
     }));
+
+    // Build SKU lookups from DB products and hardcoded catalog for fallback
+    const catalogBySku = {};
+    try {
+      MOCK_PRODUCT_CATALOG.forEach(p => { catalogBySku[p.sku] = p; });
+    } catch (e) {
+      console.warn('[recommendations] productCatalog not available for SKU fallback');
+    }
+
+    // Build aiResult lookups by SKU for robust fallback matching
+    const aiResultBySku = {};
+    aiResult.recommendations.forEach(r => {
+      const pid = r.productId || r.product_id || r.sku || '';
+      if (pid) aiResultBySku[pid] = r;
+    });
 
     // --- Return response ---
     const [recommendation, items] = await Promise.all([
@@ -392,7 +469,7 @@ router.post('/process', validateProcessBody, async (req, res, next) => {
 });
 
 // ---------------------------------------------------------------------------
-// GET /api/recommendations — list all recommendations
+// GET /api/recommendations — list recommendations for this user
 // ---------------------------------------------------------------------------
 router.get('/', async (req, res, next) => {
   try {
@@ -401,15 +478,15 @@ router.get('/', async (req, res, next) => {
 
     let sql = `SELECT r.*, i.name as institution_name, i.institution_type
                FROM recommendations r
-               JOIN institutions i ON r.institution_id = i.id WHERE 1=1`;
-    const params = [];
+               JOIN institutions i ON r.institution_id = i.id WHERE i.user_id = ?`;
+    const params = [req.user.uid];
 
     if (status) { sql += ' AND r.status = ?'; params.push(status); }
 
     const countResult = await queryAll(
       `SELECT COUNT(*) as total FROM recommendations r
-       JOIN institutions i ON r.institution_id = i.id WHERE 1=1` + (status ? ' AND r.status = ?' : ''),
-      status ? [status] : []
+       JOIN institutions i ON r.institution_id = i.id WHERE i.user_id = ?` + (status ? ' AND r.status = ?' : ''),
+      status ? [req.user.uid, status] : [req.user.uid]
     );
     const total = countResult[0]?.total || 0;
 
@@ -440,8 +517,8 @@ router.get('/:id', async (req, res, next) => {
   try {
     const recommendation = await queryOne(
       `SELECT r.*, i.name as institution_name, i.institution_type, i.area_size, i.hygiene_standard, i.budget, i.surface_types, i.metadata
-       FROM recommendations r JOIN institutions i ON r.institution_id = i.id WHERE r.id = ?`,
-      [req.params.id]
+       FROM recommendations r JOIN institutions i ON r.institution_id = i.id WHERE r.id = ? AND i.user_id = ?`,
+      [req.params.id, req.user.uid]
     );
 
     if (!recommendation) {

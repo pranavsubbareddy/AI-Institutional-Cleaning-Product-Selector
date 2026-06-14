@@ -89,6 +89,7 @@ export const api = {
   login: (data) => fetchApi('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
   logout: () => fetchApi('/auth/logout', { method: 'POST' }),
   getMe: () => fetchApi('/auth/me'),
+  deleteAccount: () => fetchApi('/auth/account', { method: 'DELETE' }),
 
   // Dashboard
   getDashboardStats: () => fetchApi('/dashboard/stats'),
@@ -137,7 +138,8 @@ export const INSTITUTION_TYPES = [
   { value: 'shopping_mall', label: 'Shopping Mall / Complex', icon: '🏬' },
   { value: 'cinema', label: 'Cinema / Theater', icon: '🎬' },
   { value: 'library', label: 'Library / Study Center', icon: '📚' },
-  { value: 'community_center', label: 'Community Center / Hall', icon: '🏛️' }
+  { value: 'community_center', label: 'Community Center / Hall', icon: '🏛️' },
+  { value: 'custom', label: 'Custom (type your own)', icon: '✏️' }
 ];
 
 export const SURFACE_TYPES = [

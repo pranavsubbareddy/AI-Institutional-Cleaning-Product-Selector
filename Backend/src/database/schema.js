@@ -44,8 +44,6 @@ async function initializeSchema() {
     console.log(' Connected to MySQL database:', database);
   }
 
-  console.log(' Connected to MySQL database:', database);
-
   // NOTE: MySQL 9.7 does not allow DEFAULT values on TEXT/BLOB/JSON columns.
   // JSON fields are stored as TEXT and application code handles null -> '[]' fallback.
 
@@ -56,7 +54,7 @@ async function initializeSchema() {
     description TEXT,
     category VARCHAR(100) NOT NULL,
     surface_types TEXT,
-    dilution_ratio VARCHAR(100),
+    dilution_ratio VARCHAR(500),
     unit VARCHAR(50) NOT NULL DEFAULT 'litre',
     unit_price DECIMAL(10,2) NOT NULL DEFAULT 0,
     coverage_per_unit DECIMAL(10,2) DEFAULT 0,
@@ -81,6 +79,7 @@ async function initializeSchema() {
     address TEXT,
     metadata TEXT,
     status VARCHAR(20) DEFAULT 'active',
+    user_id VARCHAR(50) DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
@@ -106,7 +105,7 @@ async function initializeSchema() {
     recommendation_id VARCHAR(36) NOT NULL,
     product_id VARCHAR(36) NOT NULL,
     quantity_estimate DECIMAL(10,2) NOT NULL DEFAULT 0,
-    dilution_ratio VARCHAR(100),
+    dilution_ratio VARCHAR(500),
     monthly_cost DECIMAL(10,2) DEFAULT 0,
     usage_frequency VARCHAR(50),
     priority INT DEFAULT 0,
@@ -241,11 +240,51 @@ async function initializeSchema() {
     FOREIGN KEY (document_id) REFERENCES msds_documents(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
 
+  // ── Users table ─────────────────────────────────────────────────────────
+  await pool.execute(`CREATE TABLE IF NOT EXISTS users (
+    uid VARCHAR(50) PRIMARY KEY,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    passwordHash VARCHAR(255) NOT NULL,
+    displayName VARCHAR(255) NOT NULL,
+    phone VARCHAR(50) DEFAULT '',
+    age INT NULL,
+    gender VARCHAR(20) DEFAULT '',
+    photoURL VARCHAR(500),
+    provider VARCHAR(50) DEFAULT 'password',
+    createdAt VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+  // Widen uid column on existing tables (safe if already widened)
+  try {
+    await pool.execute('ALTER TABLE users MODIFY COLUMN uid VARCHAR(50)');
+  } catch (e) {
+    // Ignore - column already wide enough
+  }
+
+  // Add user_id column for existing databases (safe if already exists)
+  try {
+    await pool.execute('ALTER TABLE institutions ADD COLUMN user_id VARCHAR(50) DEFAULT NULL AFTER status');
+  } catch (e) {
+    // Column already exists - ignore
+  }
   // Add metadata column for existing databases (safe if already exists)
   try {
     await pool.execute('ALTER TABLE institutions ADD COLUMN metadata TEXT AFTER address');
   } catch (e) {
     // Column already exists - ignore
+  }
+
+  // Widen dilution_ratio columns to accommodate AI-generated values (safe if already widened)
+  try {
+    await pool.execute('ALTER TABLE products MODIFY COLUMN dilution_ratio VARCHAR(500)');
+  } catch (e) {
+    // Column already wide enough
+  }
+  try {
+    await pool.execute('ALTER TABLE recommendation_items MODIFY COLUMN dilution_ratio VARCHAR(500)');
+  } catch (e) {
+    // Column already wide enough
   }
 
   console.log(' Database schema initialized');
