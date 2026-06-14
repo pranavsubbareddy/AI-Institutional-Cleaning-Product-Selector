@@ -33,14 +33,25 @@ export default function DetailPage() {
   return (
     <div className="animate-fade-in">
       <div className="mb-6">
-        <Link to="/dashboard" className="text-sm text-cyan-400 hover:text-cyan-300 mb-2 inline-flex items-center gap-1 transition-colors">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          Back to Dashboard
-        </Link>
-        <h1 className="text-2xl font-bold text-surface-100">{data.name}</h1>
-        <p className="text-surface-400 mt-1">Facility Details &amp; History</p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <Link to="/dashboard" className="text-sm text-cyan-400 hover:text-cyan-300 mb-2 inline-flex items-center gap-1 transition-colors">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Back to Dashboard
+            </Link>
+            <h1 className="text-2xl font-bold text-surface-100">{data.name}</h1>
+            <p className="text-surface-400 mt-1">Facility Details &amp; History</p>
+          </div>
+          <Link to={`/edit/${data.id}`}
+            className="btn-secondary flex-shrink-0 text-sm mt-6">
+            <svg className="w-4 h-4 inline mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            Edit Facility
+          </Link>
+        </div>
       </div>
 
       {/* Institution Details Card */}

@@ -10,7 +10,8 @@ const { MOCK_PRODUCT_CATALOG } = require('../engine/productCatalog');
 // Allowed enums for validation
 // ---------------------------------------------------------------------------
 const ALLOWED_INSTITUTION_TYPES = [
-  'hospital', 'school', 'hotel', 'office', 'restaurant', 'factory', 'warehouse', 'retail'
+  'hospital', 'school', 'hotel', 'office', 'restaurant', 'factory', 'warehouse', 'retail',
+  'gym', 'laboratory', 'pharmacy', 'airport', 'shopping_mall', 'cinema', 'library', 'community_center'
 ];
 const ALLOWED_HYGIENE_STANDARDS = ['basic', 'standard', 'high', 'medical_grade'];
 const ALLOWED_BUDGETS = ['low', 'medium', 'high'];
@@ -127,8 +128,16 @@ router.post('/process', validateProcessBody, async (req, res, next) => {
       });
     }
 
-    // --- Generate recommendation via AI Engine with fallback ---
+    // --- Generate recommendation using AI engine only (no rule-based fallback) ---
     const aiResult = await generateRecommendations(institution);
+
+    if (!aiResult || !aiResult.recommendations || aiResult.recommendations.length === 0) {
+      return res.status(503).json({
+        success: false,
+        error: 'AI Engine is unavailable. Please ensure a valid OpenAI or Gemini API key is configured. Only AI-generated recommendations are supported.',
+        timestamp: new Date().toISOString()
+      });
+    }
 
     // --- Save recommendation record ---
     const recId = uuidv4();
@@ -145,12 +154,13 @@ router.post('/process', validateProcessBody, async (req, res, next) => {
 
     await run(
       `INSERT INTO recommendations (id, institution_id, status, total_estimated_cost, monthly_total_quantity, summary, alerts, source, owner, processed_at)
-       VALUES (?, ?, 'Processed', ?, ?, ?, ?, 'AI_Engine', 'system', NOW())`,
+       VALUES (?, ?, 'Processed', ?, ?, ?, ?, ?, 'system', NOW())`,
       [
         recId, institution.id,
         aiResult.summary?.grossAggregatedCost || 0,
         totalMonthlyQty, summary,
-        JSON.stringify(alerts)
+        JSON.stringify(alerts),
+        'AI_Engine'
       ]
     );
 
@@ -252,6 +262,8 @@ router.post('/process', validateProcessBody, async (req, res, next) => {
         institution_id: institution.id,
         institution_name: institution.name,
         summary,
+        source: 'AI_Engine',
+        isFallback: false,
         grossAggregatedCost: aiResult.summary?.grossAggregatedCost || 0,
         financialStatusAlert: aiResult.summary?.financialStatusAlert || null
       },

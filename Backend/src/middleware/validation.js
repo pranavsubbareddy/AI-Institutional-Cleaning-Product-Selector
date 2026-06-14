@@ -1,12 +1,12 @@
 function validateInstitutionInput(req, res, next) {
-  const { name, institution_type, area_size, surface_types, hygiene_standard, budget } = req.body;
+  const { name, institution_type, area_size, surface_types, hygiene_standard, budget, contact_name, contact_email, contact_phone } = req.body;
   const errors = [];
 
   if (!name || typeof name !== 'string' || name.trim().length < 2) {
     errors.push('Institution name is required (min 2 characters)');
   }
 
-  const validTypes = ['hospital', 'school', 'hotel', 'office', 'restaurant', 'factory', 'warehouse', 'retail'];
+  const validTypes = ['hospital', 'school', 'hotel', 'office', 'restaurant', 'factory', 'warehouse', 'retail', 'gym', 'laboratory', 'pharmacy', 'airport', 'shopping_mall', 'cinema', 'library', 'community_center'];
   if (!institution_type || !validTypes.includes(institution_type)) {
     errors.push(`Institution type must be one of: ${validTypes.join(', ')}`);
   }
@@ -47,6 +47,9 @@ function validateInstitutionInput(req, res, next) {
   // Sanitize and convert
   req.body.area_size = Number(area_size);
   req.body.name = name.trim();
+  req.body.contact_name = contact_name ? contact_name.trim() : null;
+  req.body.contact_email = contact_email ? contact_email.trim() : null;
+  req.body.contact_phone = contact_phone ? contact_phone.trim() : null;
   next();
 }
 

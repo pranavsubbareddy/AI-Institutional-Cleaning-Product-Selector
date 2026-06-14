@@ -1,4 +1,4 @@
-// Ganga Maxx Marketplace - Mock Product Catalog
+// Mock Product Catalog for Cleaning Products
 // This serves as an in-memory cache for the matching logic and
 // provides full product metadata (SKU, name, price, surface compatibility, safety info)
 
@@ -6,7 +6,7 @@ const MOCK_PRODUCT_CATALOG = [
   {
     id: 'prod-gpc-001',
     sku: 'GPC-5L-001',
-    name: 'Ganga Multi-Purpose Cleaner',
+    name: 'Multi-Purpose Cleaner',
     category: 'General Purpose Cleaner',
     surface_compatibility: ['hard_floor', 'tile', 'countertop', 'wall', 'porcelain'],
     base_price_per_unit: 180.00,
@@ -21,7 +21,7 @@ const MOCK_PRODUCT_CATALOG = [
   {
     id: 'prod-dsf-002',
     sku: 'HDS-5L-002',
-    name: 'Ganga Hospital-Grade Disinfectant',
+    name: 'Hospital-Grade Disinfectant',
     category: 'Disinfectant',
     surface_compatibility: ['hard_floor', 'tile', 'stainless_steel', 'countertop', 'glass'],
     base_price_per_unit: 350.00,
@@ -36,7 +36,7 @@ const MOCK_PRODUCT_CATALOG = [
   {
     id: 'prod-gls-003',
     sku: 'GLS-5L-003',
-    name: 'Ganga Glass & Surface Shine',
+    name: 'Glass & Surface Shine',
     category: 'Glass Cleaner',
     surface_compatibility: ['glass', 'mirror', 'stainless_steel', 'countertop'],
     base_price_per_unit: 220.00,
@@ -51,7 +51,7 @@ const MOCK_PRODUCT_CATALOG = [
   {
     id: 'prod-flr-004',
     sku: 'FLR-5L-004',
-    name: 'Ganga Floor Shine Pro',
+    name: 'Floor Shine Pro',
     category: 'Floor Cleaner',
     surface_compatibility: ['hard_floor', 'tile', 'marble', 'wood', 'vinyl'],
     base_price_per_unit: 280.00,
@@ -66,7 +66,7 @@ const MOCK_PRODUCT_CATALOG = [
   {
     id: 'prod-crp-005',
     sku: 'CRP-5L-005',
-    name: 'Ganga Carpet Fresh Powder',
+    name: 'Carpet Cleaner Pro',
     category: 'Carpet Cleaner',
     surface_compatibility: ['carpet', 'upholstery', 'fabric'],
     base_price_per_unit: 420.00,

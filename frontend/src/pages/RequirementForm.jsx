@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, INSTITUTION_TYPES, SURFACE_TYPES, HYGIENE_LEVELS, BUDGET_LEVELS } from '../services/api';
+import { sendFormWithReportEmail, isEmailJSConfigured } from '../services/emailService';
 
 const FLOOR_OPTIONS = [
   { value: 1, label: 'Single Floor' },
@@ -53,15 +54,6 @@ const PREFERENCES_OPTIONS = [
   { value: 'industrial_grade', label: 'Industrial Grade', icon: '🏭' },
 ];
 
-const CERTIFICATION_OPTIONS = [
-  { value: 'iso_9001', label: 'ISO 9001' },
-  { value: 'iso_14001', label: 'ISO 14001' },
-  { value: 'haccp', label: 'HACCP' },
-  { value: 'gmp', label: 'GMP' },
-  { value: 'osha', label: 'OSHA Compliant' },
-  { value: 'green_seal', label: 'Green Seal Certified' },
-];
-
 const OPERATING_HOURS = [
   { value: 'day', label: 'Day (6AM-6PM)' },
   { value: 'night', label: 'Night (6PM-6AM)' },
@@ -74,7 +66,6 @@ export default function RequirementForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [step, setStep] = useState(1);
-  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -86,7 +77,6 @@ export default function RequirementForm() {
     contact_name: '',
     contact_email: '',
     contact_phone: '',
-    address: '',
     // Advanced fields
     floors: 1,
     occupants: 50,
@@ -95,8 +85,6 @@ export default function RequirementForm() {
     facility_age: 'moderate',
     equipment: [],
     preferences: [],
-    certifications: [],
-    special_requirements: '',
     facility_description: '',
     current_products: '',
   });
@@ -131,7 +119,6 @@ export default function RequirementForm() {
         contact_name: formData.contact_name || null,
         contact_email: formData.contact_email || null,
         contact_phone: formData.contact_phone || null,
-        address: formData.address || null,
         metadata: {
           floors: formData.floors,
           occupants: formData.occupants,
@@ -140,8 +127,6 @@ export default function RequirementForm() {
           facility_age: formData.facility_age,
           equipment: formData.equipment,
           preferences: formData.preferences,
-          certifications: formData.certifications,
-          special_requirements: formData.special_requirements || null,
           facility_description: formData.facility_description || null,
           current_products: formData.current_products || null,
         },
@@ -150,7 +135,30 @@ export default function RequirementForm() {
       const institutionId = response.data.id;
       const recResponse = await api.processRecommendation(institutionId);
 
-      navigate('/recommendations/' + recResponse.data.recommendation.id);
+      // Auto-send confirmation email if configured and contact email provided
+      let emailResult = { skipped: true };
+      if (formData.contact_email && isEmailJSConfigured()) {
+        try {
+          // Fire email in background - don't block navigation
+          const emailPromise = sendFormWithReportEmail(formData, recResponse.data);
+          const timeout = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('timeout')), 8000)
+          );
+          const result = await Promise.race([emailPromise, timeout]);
+          emailResult = result;
+        } catch (emailErr) {
+          emailResult = {
+            success: false,
+            timedOut: emailErr.message === 'timeout',
+            error: emailErr.message === 'timeout' ? 'Email timed out' : (emailErr.message || 'Email failed'),
+          };
+        }
+      }
+
+      // Navigate to recommendations with email result
+      navigate('/recommendations/' + recResponse.data.recommendation.id, {
+        state: { emailResult }
+      });
     } catch (err) {
       setError(err.message || 'Failed to process request. Please try again.');
     } finally {
@@ -455,62 +463,6 @@ export default function RequirementForm() {
             </div>
 
             <div>
-              <label className="label text-base">Industry Certifications / Compliance</label>
-              <p className="text-xs text-surface-500 mb-3">Select certifications your facility requires</p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {CERTIFICATION_OPTIONS.map(item => (
-                  <button key={item.value} type="button"
-                    onClick={() => handleToggle('certifications', item.value)}
-                    className={`px-3 py-2.5 rounded-xl border text-sm font-medium transition-all duration-200 ${
-                      formData.certifications.includes(item.value) 
-                        ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400 ring-1 ring-cyan-500/30' 
-                        : 'border-surface-600 hover:border-surface-500 bg-surface-700/50 text-surface-300'
-                    }`}>
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Contact Section */}
-            <div className="pt-4 border-t border-surface-700">
-              <h3 className="text-base font-semibold text-surface-100 mb-4 flex items-center gap-2">
-                <svg className="w-5 h-5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-                Contact Information
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="label">Contact Person</label>
-                  <input type="text" name="contact_name" value={formData.contact_name} onChange={handleChange}
-                    className="input-field" placeholder="e.g., John Doe" />
-                </div>
-                <div>
-                  <label className="label">Email Address</label>
-                  <input type="email" name="contact_email" value={formData.contact_email} onChange={handleChange}
-                    className="input-field" placeholder="john@hospital.com" />
-                </div>
-                <div>
-                  <label className="label">Phone Number</label>
-                  <input type="tel" name="contact_phone" value={formData.contact_phone} onChange={handleChange}
-                    className="input-field" placeholder="+91-9876543210" />
-                </div>
-                <div>
-                  <label className="label">Facility Address</label>
-                  <input type="text" name="address" value={formData.address} onChange={handleChange}
-                    className="input-field" placeholder="Facility address" />
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label className="label">Special Requirements or Notes</label>
-              <textarea name="special_requirements" value={formData.special_requirements} onChange={handleChange}
-                className="input-field" rows="3" placeholder="Any specific requirements, challenges, or notes about your facility..."></textarea>
-            </div>
-
-            <div>
               <label className="label">Current Products Used (Optional)</label>
               <textarea name="current_products" value={formData.current_products} onChange={handleChange}
                 className="input-field" rows="2" placeholder="List any cleaning products you currently use or brands you prefer..."></textarea>
@@ -530,6 +482,7 @@ export default function RequirementForm() {
               <div>
                 <h3 className="text-lg font-semibold text-surface-100">Review Your Requirements</h3>
                 <p className="text-sm text-surface-400">Please verify all details before submitting</p>
+
               </div>
             </div>
 
@@ -557,32 +510,13 @@ export default function RequirementForm() {
               </div>
             </div>
 
-            {(formData.equipment.length > 0 || formData.preferences.length > 0 || formData.certifications.length > 0) && (
+            {(formData.equipment.length > 0 || formData.preferences.length > 0) && (
               <div className="bg-surface-700/30 rounded-xl p-4 border border-surface-600/50">
                 <h4 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">Preferences & Equipment</h4>
                 <div className="flex flex-wrap gap-2">
                   {formData.equipment.map(e => <span key={e} className="badge bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">{EQUIPMENT_OPTIONS.find(o=>o.value===e)?.label||e}</span>)}
                   {formData.preferences.map(p => <span key={p} className="badge bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">{PREFERENCES_OPTIONS.find(o=>o.value===p)?.icon} {PREFERENCES_OPTIONS.find(o=>o.value===p)?.label||p}</span>)}
-                  {formData.certifications.map(c => <span key={c} className="badge bg-purple-500/10 text-purple-400 border border-purple-500/20">{CERTIFICATION_OPTIONS.find(o=>o.value===c)?.label||c}</span>)}
                 </div>
-              </div>
-            )}
-
-            {formData.contact_name && (
-              <div className="bg-surface-700/30 rounded-xl p-4 border border-surface-600/50">
-                <h4 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">Contact</h4>
-                <dl className="space-y-2 text-sm">
-                  <div className="flex justify-between"><dt className="text-surface-400">Person</dt><dd className="text-surface-200">{formData.contact_name}</dd></div>
-                  {formData.contact_email && <div className="flex justify-between"><dt className="text-surface-400">Email</dt><dd className="text-surface-200">{formData.contact_email}</dd></div>}
-                  {formData.contact_phone && <div className="flex justify-between"><dt className="text-surface-400">Phone</dt><dd className="text-surface-200">{formData.contact_phone}</dd></div>}
-                </dl>
-              </div>
-            )}
-
-            {formData.special_requirements && (
-              <div className="bg-amber-500/10 rounded-xl p-4 border border-amber-500/20">
-                <h4 className="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-2">Special Requirements</h4>
-                <p className="text-sm text-amber-300">{formData.special_requirements}</p>
               </div>
             )}
           </div>

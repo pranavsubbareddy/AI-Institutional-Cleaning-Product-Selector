@@ -3,7 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 const PRODUCT_KNOWLEDGE_BASE = {
   products: [
     {
-      id: 'prod-gpc-001', name: 'Ganga Multi-Purpose Cleaner', category: 'General Purpose Cleaner',
+      id: 'prod-gpc-001', name: 'Multi-Purpose Cleaner', category: 'General Purpose Cleaner',
       surface_types: ['hard_floor', 'tile', 'countertop'], dilution_ratio: '1:40 (40ml per litre)',
       unit: 'litre', unit_price: 180, coverage_per_unit: 40, hygiene_level: 'standard',
       safety_notes: 'Wear gloves. Avoid contact with eyes. Keep away from children.',
@@ -13,7 +13,7 @@ const PRODUCT_KNOWLEDGE_BASE = {
       certifications_hint: 'green_seal'
     },
     {
-      id: 'prod-dsf-002', name: 'Ganga Hospital-Grade Disinfectant', category: 'Disinfectant',
+      id: 'prod-dsf-002', name: 'Hospital-Grade Disinfectant', category: 'Disinfectant',
       surface_types: ['hard_floor', 'tile', 'stainless_steel', 'countertop'], dilution_ratio: '1:20 (50ml per litre)',
       unit: 'litre', unit_price: 350, coverage_per_unit: 30, hygiene_level: 'medical_grade',
       safety_notes: 'Wear gloves and mask. Ensure ventilation. Do not mix with other chemicals.',
@@ -23,7 +23,7 @@ const PRODUCT_KNOWLEDGE_BASE = {
       certifications_hint: 'haccp'
     },
     {
-      id: 'prod-gls-003', name: 'Ganga Glass & Surface Shine', category: 'Glass Cleaner',
+      id: 'prod-gls-003', name: 'Glass & Surface Shine', category: 'Glass Cleaner',
       surface_types: ['glass', 'mirror', 'stainless_steel'], dilution_ratio: 'Ready to use',
       unit: 'litre', unit_price: 220, coverage_per_unit: 50, hygiene_level: 'standard',
       safety_notes: 'Spray in well-ventilated area. Avoid spraying on electronics.',
@@ -33,7 +33,7 @@ const PRODUCT_KNOWLEDGE_BASE = {
       certifications_hint: 'green_seal'
     },
     {
-      id: 'prod-flr-004', name: 'Ganga Floor Shine Pro', category: 'Floor Cleaner',
+      id: 'prod-flr-004', name: 'Floor Shine Pro', category: 'Floor Cleaner',
       surface_types: ['hard_floor', 'tile', 'marble'], dilution_ratio: '1:30 (33ml per litre)',
       unit: 'litre', unit_price: 280, coverage_per_unit: 35, hygiene_level: 'standard',
       safety_notes: 'May make floor slippery. Use caution signs during cleaning.',
@@ -43,7 +43,7 @@ const PRODUCT_KNOWLEDGE_BASE = {
       certifications_hint: 'iso_14001'
     },
     {
-      id: 'prod-crp-005', name: 'Ganga Carpet Fresh', category: 'Carpet Cleaner',
+      id: 'prod-crp-005', name: 'Carpet Cleaner Pro', category: 'Carpet Cleaner',
       surface_types: ['carpet'], dilution_ratio: '1:15 (65ml per litre)',
       unit: 'litre', unit_price: 420, coverage_per_unit: 20, hygiene_level: 'standard',
       safety_notes: 'Test on inconspicuous area first. Ensure carpet dries completely.',
@@ -53,7 +53,7 @@ const PRODUCT_KNOWLEDGE_BASE = {
       certifications_hint: null
     },
     {
-      id: 'prod-stl-006', name: 'Ganga Stainless Steel Polish', category: 'Stainless Steel Polish',
+      id: 'prod-stl-006', name: 'Stainless Steel Polish', category: 'Stainless Steel Polish',
       surface_types: ['stainless_steel'], dilution_ratio: 'Ready to use',
       unit: 'litre', unit_price: 380, coverage_per_unit: 60, hygiene_level: 'standard',
       safety_notes: 'Flammable. Keep away from heat sources. Use in ventilated area.',
@@ -63,7 +63,7 @@ const PRODUCT_KNOWLEDGE_BASE = {
       certifications_hint: null
     },
     {
-      id: 'prod-wpd-007', name: 'Ganga Wood Polish Premium', category: 'Wood Polish',
+      id: 'prod-wpd-007', name: 'Wood Polish Premium', category: 'Wood Polish',
       surface_types: ['wood'], dilution_ratio: 'Ready to use',
       unit: 'litre', unit_price: 450, coverage_per_unit: 55, hygiene_level: 'standard',
       safety_notes: 'Flammable. Keep away from open flames. Use gloves.',
@@ -73,7 +73,7 @@ const PRODUCT_KNOWLEDGE_BASE = {
       certifications_hint: null
     },
     {
-      id: 'prod-tlt-008', name: 'Ganga Toilet & Restroom Cleaner', category: 'Toilet Cleaner',
+      id: 'prod-tlt-008', name: 'Toilet & Restroom Cleaner', category: 'Toilet Cleaner',
       surface_types: ['tile', 'porcelain'], dilution_ratio: 'Ready to use',
       unit: 'litre', unit_price: 200, coverage_per_unit: 25, hygiene_level: 'standard',
       safety_notes: 'Do not mix with bleach or acidic cleaners. Use gloves.',
@@ -83,7 +83,7 @@ const PRODUCT_KNOWLEDGE_BASE = {
       certifications_hint: null
     },
     {
-      id: 'prod-hnd-009', name: 'Ganga Hand Sanitizer Gel', category: 'Hand Sanitizer',
+      id: 'prod-hnd-009', name: 'Hand Sanitizer Gel', category: 'Hand Sanitizer',
       surface_types: ['skin'], dilution_ratio: 'Ready to use',
       unit: 'litre', unit_price: 160, coverage_per_unit: 100, hygiene_level: 'high',
       safety_notes: 'For external use only. Flammable. Keep away from children.',
@@ -93,7 +93,7 @@ const PRODUCT_KNOWLEDGE_BASE = {
       certifications_hint: 'osha'
     },
     {
-      id: 'prod-hdd-010', name: 'Ganga Heavy Duty Degreaser', category: 'Heavy Duty Degreaser',
+      id: 'prod-hdd-010', name: 'Heavy Duty Degreaser', category: 'Heavy Duty Degreaser',
       surface_types: ['hard_floor', 'stainless_steel', 'tile', 'countertop'], dilution_ratio: '1:10 (100ml per litre)',
       unit: 'litre', unit_price: 320, coverage_per_unit: 15, hygiene_level: 'standard',
       safety_notes: 'Wear protective gloves and goggles. Avoid prolonged skin contact.',
@@ -103,7 +103,7 @@ const PRODUCT_KNOWLEDGE_BASE = {
       certifications_hint: 'haccp'
     },
     {
-      id: 'prod-bio-011', name: 'Ganga Bio-Enzymatic Drain Cleaner', category: 'Drain Cleaner',
+      id: 'prod-bio-011', name: 'Bio-Enzymatic Drain Cleaner', category: 'Drain Cleaner',
       surface_types: ['drain'], dilution_ratio: 'Ready to use',
       unit: 'litre', unit_price: 290, coverage_per_unit: 10, hygiene_level: 'standard',
       safety_notes: 'Non-toxic and biodegradable. Safe for septic systems.',
@@ -113,7 +113,7 @@ const PRODUCT_KNOWLEDGE_BASE = {
       certifications_hint: 'green_seal'
     },
     {
-      id: 'prod-air-012', name: 'Ganga Air Freshener Mist', category: 'Air Freshener',
+      id: 'prod-air-012', name: 'Air Freshener Mist', category: 'Air Freshener',
       surface_types: ['air'], dilution_ratio: 'Ready to use',
       unit: 'litre', unit_price: 190, coverage_per_unit: 80, hygiene_level: 'standard',
       safety_notes: 'Pressurized container. Do not puncture. Keep away from heat.',
@@ -125,14 +125,62 @@ const PRODUCT_KNOWLEDGE_BASE = {
   ],
 
   institutionTypeProfiles: {
-    hospital: { priority_products: ['Disinfectant', 'Hand Sanitizer', 'General Purpose Cleaner', 'Floor Cleaner', 'Toilet Cleaner'], hygiene_multiplier: 1.5, area_coverage_factor: 0.3, label: 'Hospital / Healthcare' },
-    school: { priority_products: ['Disinfectant', 'Hand Sanitizer', 'General Purpose Cleaner', 'Floor Cleaner', 'Glass Cleaner'], hygiene_multiplier: 1.2, area_coverage_factor: 0.25, label: 'School / Educational' },
-    hotel: { priority_products: ['General Purpose Cleaner', 'Glass Cleaner', 'Carpet Cleaner', 'Toilet Cleaner', 'Air Freshener', 'Floor Cleaner'], hygiene_multiplier: 1.3, area_coverage_factor: 0.35, label: 'Hotel / Hospitality' },
-    office: { priority_products: ['General Purpose Cleaner', 'Glass Cleaner', 'Hand Sanitizer', 'Floor Cleaner', 'Air Freshener'], hygiene_multiplier: 1.0, area_coverage_factor: 0.2, label: 'Office / Corporate' },
-    restaurant: { priority_products: ['Heavy Duty Degreaser', 'Disinfectant', 'Floor Cleaner', 'General Purpose Cleaner', 'Toilet Cleaner'], hygiene_multiplier: 1.4, area_coverage_factor: 0.4, label: 'Restaurant / Food Service' },
-    factory: { priority_products: ['Heavy Duty Degreaser', 'Floor Cleaner', 'General Purpose Cleaner', 'Hand Sanitizer', 'Drain Cleaner'], hygiene_multiplier: 1.1, area_coverage_factor: 0.3, label: 'Factory / Industrial' },
-    warehouse: { priority_products: ['Floor Cleaner', 'General Purpose Cleaner', 'Heavy Duty Degreaser'], hygiene_multiplier: 0.8, area_coverage_factor: 0.15, label: 'Warehouse / Storage' },
-    retail: { priority_products: ['Glass Cleaner', 'Floor Cleaner', 'General Purpose Cleaner', 'Air Freshener'], hygiene_multiplier: 1.0, area_coverage_factor: 0.2, label: 'Retail / Store' }
+    hospital: {
+      priority_products: ['Disinfectant', 'Hand Sanitizer', 'General Purpose Cleaner', 'Floor Cleaner', 'Toilet Cleaner'],
+      type_bonus: { 'Disinfectant': 40, 'Hand Sanitizer': 30, 'General Purpose Cleaner': 15, 'Floor Cleaner': 10, 'Toilet Cleaner': 10 },
+      category_qty_multiplier: { 'Disinfectant': 2.0, 'Hand Sanitizer': 1.8, 'Toilet Cleaner': 1.5 },
+      hygiene_multiplier: 1.5, area_coverage_factor: 0.3, label: 'Hospital / Healthcare',
+      alert: 'Critical healthcare facility: Ensure all disinfectants meet health board standards. Maintain log of cleaning activities.'
+    },
+    school: {
+      priority_products: ['Disinfectant', 'Hand Sanitizer', 'General Purpose Cleaner', 'Floor Cleaner', 'Glass Cleaner'],
+      type_bonus: { 'Disinfectant': 30, 'Hand Sanitizer': 25, 'General Purpose Cleaner': 20, 'Floor Cleaner': 10, 'Glass Cleaner': 8 },
+      category_qty_multiplier: { 'Hand Sanitizer': 1.6, 'Disinfectant': 1.3, 'General Purpose Cleaner': 1.2 },
+      hygiene_multiplier: 1.2, area_coverage_factor: 0.25, label: 'School / Educational',
+      alert: 'Educational facility: Prioritize non-toxic, child-safe cleaning products. Focus on high-touch surface disinfection.'
+    },
+    hotel: {
+      priority_products: ['General Purpose Cleaner', 'Glass Cleaner', 'Carpet Cleaner', 'Toilet Cleaner', 'Air Freshener', 'Floor Cleaner'],
+      type_bonus: { 'Carpet Cleaner': 35, 'Glass Cleaner': 30, 'Air Freshener': 25, 'Toilet Cleaner': 20, 'General Purpose Cleaner': 15, 'Floor Cleaner': 10 },
+      category_qty_multiplier: { 'Carpet Cleaner': 2.0, 'Glass Cleaner': 1.5, 'Air Freshener': 1.8, 'Toilet Cleaner': 1.4 },
+      hygiene_multiplier: 1.3, area_coverage_factor: 0.35, label: 'Hotel / Hospitality',
+      alert: 'Hospitality facility: Guest experience depends on cleanliness. Prioritize glass shine, carpet freshness, and pleasant ambiance.'
+    },
+    office: {
+      priority_products: ['General Purpose Cleaner', 'Glass Cleaner', 'Hand Sanitizer', 'Floor Cleaner', 'Air Freshener'],
+      type_bonus: { 'General Purpose Cleaner': 25, 'Glass Cleaner': 20, 'Hand Sanitizer': 18, 'Floor Cleaner': 12, 'Air Freshener': 10 },
+      category_qty_multiplier: { 'General Purpose Cleaner': 1.3, 'Hand Sanitizer': 1.5, 'Air Freshener': 1.2 },
+      hygiene_multiplier: 1.0, area_coverage_factor: 0.2, label: 'Office / Corporate',
+      alert: 'Corporate facility: Maintain professional appearance. Focus on common areas, restrooms, and break rooms.'
+    },
+    restaurant: {
+      priority_products: ['Heavy Duty Degreaser', 'Disinfectant', 'Floor Cleaner', 'General Purpose Cleaner', 'Toilet Cleaner'],
+      type_bonus: { 'Heavy Duty Degreaser': 45, 'Disinfectant': 35, 'Floor Cleaner': 20, 'General Purpose Cleaner': 15, 'Toilet Cleaner': 10 },
+      category_qty_multiplier: { 'Heavy Duty Degreaser': 2.5, 'Disinfectant': 1.6, 'Floor Cleaner': 1.4, 'General Purpose Cleaner': 1.3 },
+      hygiene_multiplier: 1.4, area_coverage_factor: 0.4, label: 'Restaurant / Food Service',
+      alert: 'Food service facility: All cleaning products must be food-safe. Heavy degreasing required for kitchen areas. Comply with health department regulations.'
+    },
+    factory: {
+      priority_products: ['Heavy Duty Degreaser', 'Floor Cleaner', 'General Purpose Cleaner', 'Hand Sanitizer', 'Drain Cleaner'],
+      type_bonus: { 'Heavy Duty Degreaser': 40, 'Drain Cleaner': 30, 'Floor Cleaner': 25, 'General Purpose Cleaner': 15, 'Hand Sanitizer': 10 },
+      category_qty_multiplier: { 'Heavy Duty Degreaser': 2.0, 'Drain Cleaner': 1.8, 'Floor Cleaner': 1.5 },
+      hygiene_multiplier: 1.1, area_coverage_factor: 0.3, label: 'Factory / Industrial',
+      alert: 'Industrial facility: Heavy-duty cleaning required for machinery areas. Ensure proper ventilation when using industrial cleaners.'
+    },
+    warehouse: {
+      priority_products: ['Floor Cleaner', 'General Purpose Cleaner', 'Heavy Duty Degreaser'],
+      type_bonus: { 'Floor Cleaner': 35, 'General Purpose Cleaner': 25, 'Heavy Duty Degreaser': 15 },
+      category_qty_multiplier: { 'Floor Cleaner': 1.6, 'General Purpose Cleaner': 1.3 },
+      hygiene_multiplier: 0.8, area_coverage_factor: 0.15, label: 'Warehouse / Storage',
+      alert: 'Warehouse facility: Focus on floor maintenance and dust control. Large areas benefit from mechanical scrubbers.'
+    },
+    retail: {
+      priority_products: ['Glass Cleaner', 'Floor Cleaner', 'General Purpose Cleaner', 'Air Freshener'],
+      type_bonus: { 'Glass Cleaner': 35, 'Floor Cleaner': 25, 'General Purpose Cleaner': 20, 'Air Freshener': 15 },
+      category_qty_multiplier: { 'Glass Cleaner': 1.6, 'Floor Cleaner': 1.4, 'Air Freshener': 1.5 },
+      hygiene_multiplier: 1.0, area_coverage_factor: 0.2, label: 'Retail / Store',
+      alert: 'Retail facility: First impressions matter. Prioritize clean windows, floors, and pleasant in-store scent.'
+    }
   },
 
   surfaceTypeProductMap: {
@@ -204,13 +252,24 @@ function generateRecommendation(institutionData) {
   const scoredProducts = PRODUCT_KNOWLEDGE_BASE.products.map(product => {
     let score = 0;
 
-    // --- Base scoring (institution type, surface match, hygiene, budget) ---
+    // --- Institution-type-specific scoring (highly differentiated) ---
+    // 1. Type bonus: massive boost for key products per institution type
+    const typeBonus = profile.type_bonus?.[product.category] || 0;
+    score += typeBonus;
+
+    // 2. Priority position bonus: extra points based on order in priority list
     const typePriorityIndex = profile.priority_products.indexOf(product.category);
     if (typePriorityIndex >= 0) {
-      score += (profile.priority_products.length - typePriorityIndex) * 15;
+      // Higher bonus for higher-priority items: 20, 15, 10, 8, 6, 4...
+      const posBonus = Math.max(20 - typePriorityIndex * 5, 4);
+      score += posBonus;
     }
+
+    // --- Surface compatibility ---
     const surfaceMatch = surfaceTypes.some(s => product.surface_types.includes(s));
     if (surfaceMatch) score += 25;
+
+    // --- Hygiene level scoring ---
     const productHygieneLevel = product.hygiene_level || 'standard';
     const hygieneLevels = ['basic', 'standard', 'high', 'medical_grade'];
     const requiredIndex = hygieneLevels.indexOf(hygieneStandard);
@@ -220,6 +279,8 @@ function generateRecommendation(institutionData) {
     } else if (hygieneStandard === 'medical_grade' && product.category === 'Disinfectant') {
       score += 20;
     }
+
+    // --- Budget scoring ---
     if (budget === 'low' && product.unit_price <= 250) score += 10;
     if (budget === 'medium' && product.unit_price > 200 && product.unit_price <= 400) score += 5;
     if (budget === 'high' && product.unit_price > 350) score += 10;
@@ -286,13 +347,13 @@ function generateRecommendation(institutionData) {
 
   if (topProducts.length === 0) {
     const fallback = scoredProducts.slice(0, 3);
-    return buildRecommendationOutput(fallback, areaSize, hygieneConfig, budgetConfig, profile, metadata);
+    return buildRecommendationOutput(fallback, areaSize, hygieneConfig, budgetConfig, profile, metadata, instType);
   }
 
-  return buildRecommendationOutput(topProducts, areaSize, hygieneConfig, budgetConfig, profile, metadata);
+  return buildRecommendationOutput(topProducts, areaSize, hygieneConfig, budgetConfig, profile, metadata, instType);
 }
 
-function buildRecommendationOutput(scoredProducts, areaSize, hygieneConfig, budgetConfig, profile, metadata = {}) {
+function buildRecommendationOutput(scoredProducts, areaSize, hygieneConfig, budgetConfig, profile, metadata = {}, instType) {
   const items = [];
   let totalCost = 0;
   let totalQuantity = 0;
@@ -335,9 +396,12 @@ function buildRecommendationOutput(scoredProducts, areaSize, hygieneConfig, budg
     const frequencyMultiplier = hygieneConfig.frequency_multiplier;
     const priceMultiplier = budgetConfig.price_multiplier;
 
+    // Apply category-specific quantity multiplier per institution type
+    const categoryQtyMult = profile.category_qty_multiplier?.[product.category] || 1.0;
+
     // Apply equipment efficiency to quantity
     const adjustedQuantity = Math.ceil(
-      baseQuantity * frequencyMultiplier * 4 * equipmentEfficiency * frequencyAdjustment * occupantFactor
+      baseQuantity * frequencyMultiplier * 4 * equipmentEfficiency * frequencyAdjustment * occupantFactor * categoryQtyMult
     );
     
     const monthlyCost = Math.round(adjustedQuantity * product.unit_price * priceMultiplier);
@@ -376,8 +440,12 @@ function buildRecommendationOutput(scoredProducts, areaSize, hygieneConfig, budg
 
   items.sort((a, b) => a.priority - b.priority);
 
-  // --- Enhanced alerts based on metadata ---
+  // --- Institution-type-specific alert (always shown) ---
+  if (profile.alert) {
+    alerts.push(profile.alert);
+  }
 
+  // --- Enhanced alerts based on metadata ---
   if (hygieneConfig.frequency_multiplier >= 1.5) {
     alerts.push('High hygiene standard detected: Increase cleaning frequency and use appropriate PPE.');
   }
@@ -386,9 +454,6 @@ function buildRecommendationOutput(scoredProducts, areaSize, hygieneConfig, budg
   }
   if (budgetConfig.price_multiplier <= 0.8) {
     alerts.push('Budget-friendly options selected: Economy products provide adequate cleanliness at reduced cost.');
-  }
-  if (profile.label.includes('Hospital') || profile.label.includes('Food')) {
-    alerts.push('Critical facility type: Ensure compliance with local health and safety regulations.');
   }
   if (totalCost > 100000) {
     alerts.push('Estimated monthly cost exceeds Rs 1,00,000: Special contract pricing may be available. Contact sales for negotiation.');
@@ -423,12 +488,34 @@ function buildRecommendationOutput(scoredProducts, areaSize, hygieneConfig, budg
     alerts.push('Older facility: Heavy-duty cleaning may be needed for aged surfaces and fixtures.');
   }
 
-  // Build summary with metadata context
+  // Build enriched summary with institution-type context
+  const topProduct = items[0]?.product_name || 'cleaning products';
+  const topCategory = items[0]?.category || '';
   let summary = 'Recommended ' + items.length + ' products for ' + profile.label + ' facility of ' + areaSize + ' sq. ft. ';
-  
+
+  // Add facility profile context
   if (floors > 1) summary += floors + ' floors, ';
   if (occupants > 0) summary += occupants + '+ occupants, ';
-  
+  if (metadata.operating_hours === '24x7') summary += '24x7 operation, ';
+
+  // Add institution-type-specific recommendation highlight
+  summary += 'Top priority: ' + topProduct + '. ';
+
+  // Add contextual note based on institution type
+  const typeNotes = {
+    hospital: 'Focus on infection control and high-touch surface disinfection.',
+    school: 'Emphasis on child-safe, non-toxic products for student safety.',
+    hotel: 'Guest satisfaction driven by sparkling glass, fresh carpets, and pleasant scent.',
+    office: 'Professional appearance and employee comfort are key priorities.',
+    restaurant: 'Kitchen grease management and food-contact surface safety are critical.',
+    factory: 'Heavy-duty cleaning for machinery, floors, and drainage systems.',
+    warehouse: 'Floor maintenance and dust control for large storage areas.',
+    retail: 'Clean windows, floors, and fresh scent create positive customer impressions.'
+  };
+  if (instType && typeNotes[instType]) {
+    summary += typeNotes[metadata.institution_type] + ' ';
+  }
+
   summary += 'Hygiene standard: ' + hygieneConfig.label + '. Budget: ' + budgetConfig.label + '. ' +
     'Monthly estimated cost: Rs ' + totalCost.toLocaleString('en-IN') + '. ' +
     'Total monthly quantity: ' + totalQuantity + ' litres.';

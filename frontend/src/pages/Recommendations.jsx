@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import { api, formatCurrency } from '../services/api';
 import ProductCard from '../components/ProductCard';
 import LoadingState from '../components/LoadingState';
@@ -7,11 +7,37 @@ import ErrorState from '../components/ErrorState';
 
 export default function Recommendations() {
   const { id } = useParams();
-  const navigate = useNavigate();
+  const location = useLocation();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [toast, setToast] = useState(null);
+  const emailProcessedRef = useRef(false);
+
+  // Handle email result from location state (passed from RequirementForm)
+  useEffect(() => {
+    const emailResult = location.state?.emailResult;
+    if (!emailResult || emailProcessedRef.current) return;
+    emailProcessedRef.current = true;
+
+    if (emailResult.skipped) return;
+
+    if (emailResult.success) {
+      setToast({ type: 'success', message: 'Confirmation email sent successfully to your inbox!' });
+    } else if (emailResult.timedOut) {
+      setToast({ type: 'warning', message: 'Email is being sent in the background. Check your inbox shortly.' });
+    } else {
+      setToast({ type: 'error', message: `Failed to send email: ${emailResult.error}` });
+    }
+
+    const timer = setTimeout(() => setToast(null), 6000);
+    return () => clearTimeout(timer);
+  }, [location.state]);
+
+  const dismissToast = useCallback(() => {
+    setToast(null);
+  }, []);
 
   useEffect(() => {
     fetchRecommendation();
@@ -57,6 +83,48 @@ export default function Recommendations() {
 
   return (
     <div className="animate-fade-in">
+      {/* Email Toast Notification */}
+      {toast && (
+        <div className={`fixed top-20 right-4 sm:right-6 z-50 max-w-sm animate-slide-in-right transition-all duration-300 ${
+          toast ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-8'
+        }`}>
+          <div className={`rounded-xl p-4 shadow-2xl border flex items-start gap-3 ${
+            toast.type === 'success'
+              ? 'bg-emerald-900/95 border-emerald-500/30 text-emerald-200'
+              : toast.type === 'warning'
+                ? 'bg-amber-900/95 border-amber-500/30 text-amber-200'
+                : 'bg-red-900/95 border-red-500/30 text-red-200'
+          }`}>
+            <div className="flex-shrink-0 mt-0.5">
+              {toast.type === 'success' ? (
+                <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              ) : toast.type === 'warning' ? (
+                <svg className="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium">
+                {toast.type === 'success' ? 'Email Sent' : toast.type === 'warning' ? 'Sending Email' : 'Email Failed'}
+              </p>
+              <p className="text-xs mt-1 opacity-80">{toast.message}</p>
+            </div>
+            <button onClick={dismissToast} className="flex-shrink-0 p-1 rounded-lg hover:bg-white/10 transition-colors">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
         <div>
@@ -66,19 +134,13 @@ export default function Recommendations() {
           <h1 className="text-2xl font-bold text-surface-100">Product Recommendations</h1>
           <p className="text-surface-400 mt-1">For <span className="text-surface-200 font-medium">{data.institution_name}</span></p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <button onClick={handleCopyAll} className="btn-secondary text-sm">
             <svg className="w-4 h-4 inline mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={copied ? 'M5 13l4 4L19 7' : 'M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z'} />
             </svg>
-            {copied ? 'Copied!' : 'Copy Full Quotation'}
+            {copied ? 'Copied!' : 'Copy Quotation'}
           </button>
-          <Link to={`/detail/${data.id}`} className="btn-primary text-sm">
-            <svg className="w-4 h-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Details
-          </Link>
         </div>
       </div>
 
@@ -252,14 +314,27 @@ export default function Recommendations() {
         </div>
       )}
 
-      {/* Summary */}
+      {/* Summary & Engine Source Badge */}
       {data.summary && (
         <div className="mb-6 p-4 bg-cyan-500/10 border border-cyan-500/20 rounded-xl">
           <div className="flex items-start gap-3">
             <svg className="w-5 h-5 text-cyan-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <p className="text-sm text-cyan-300">{data.summary}</p>
+            <div className="flex-1">
+              <p className="text-sm text-cyan-300">{data.summary}</p>
+            </div>
+            <span className={`flex-shrink-0 text-[10px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-full border ${
+              (data.engine_source || data.recommendation?.source) === 'AI_Engine'
+                ? 'bg-fuchsia-500/10 text-fuchsia-400 border-fuchsia-500/30'
+                : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+            }`}>
+              {(data.engine_source || data.recommendation?.source) === 'AI_Engine' ? (
+                <><span className="inline-block w-1.5 h-1.5 bg-fuchsia-400 rounded-full animate-pulse mr-1.5"></span>AI Powered</>
+              ) : (
+                <><span className="inline-block w-1.5 h-1.5 bg-amber-400 rounded-full mr-1.5"></span>Rule Engine</>
+              )}
+            </span>
           </div>
         </div>
       )}

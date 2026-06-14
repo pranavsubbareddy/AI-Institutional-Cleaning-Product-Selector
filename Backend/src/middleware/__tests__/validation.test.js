@@ -24,6 +24,9 @@ describe('validateInstitutionInput', () => {
     surface_types: ['hard_floor', 'tile'],
     hygiene_standard: 'standard',
     budget: 'medium',
+    contact_name: 'John Doe',
+    contact_email: 'john@hospital.com',
+    contact_phone: '+91-9876543210',
   };
 
   test('passes with valid input and calls next()', () => {
@@ -33,15 +36,21 @@ describe('validateInstitutionInput', () => {
     expect(res.status).not.toHaveBeenCalled();
   });
 
-  test('converts area_size to number and trims name', () => {
+  test('converts area_size to number and trims name/contact', () => {
     const { req, res, next } = mockReqRes({
       ...validBody,
       name: '  Test Hospital  ',
       area_size: '5000',
+      contact_name: '  John Doe  ',
+      contact_email: '  john@hospital.com  ',
+      contact_phone: '  +91-9876543210  ',
     });
     validateInstitutionInput(req, res, next);
     expect(req.body.area_size).toBe(5000);
     expect(req.body.name).toBe('Test Hospital');
+    expect(req.body.contact_name).toBe('John Doe');
+    expect(req.body.contact_email).toBe('john@hospital.com');
+    expect(req.body.contact_phone).toBe('+91-9876543210');
     expect(next).toHaveBeenCalled();
   });
 
@@ -222,8 +231,70 @@ describe('validateInstitutionInput', () => {
     });
   });
 
+  describe('contact fields — now optional', () => {
+    test('passes with all contact fields missing', () => {
+      const { req, res, next } = mockReqRes({
+        ...validBody,
+        contact_name: undefined,
+        contact_email: undefined,
+        contact_phone: undefined,
+      });
+      validateInstitutionInput(req, res, next);
+      expect(next).toHaveBeenCalled();
+      expect(res.status).not.toHaveBeenCalledWith(400);
+      // Contact fields should be sanitised to null when not provided
+      expect(req.body.contact_name).toBeNull();
+      expect(req.body.contact_email).toBeNull();
+      expect(req.body.contact_phone).toBeNull();
+    });
+
+    test('passes with contact fields empty strings', () => {
+      const { req, res, next } = mockReqRes({
+        ...validBody,
+        contact_name: '',
+        contact_email: '',
+        contact_phone: '',
+      });
+      validateInstitutionInput(req, res, next);
+      expect(next).toHaveBeenCalled();
+      expect(res.status).not.toHaveBeenCalledWith(400);
+      // Empty strings are falsy → set to null
+      expect(req.body.contact_name).toBeNull();
+      expect(req.body.contact_email).toBeNull();
+      expect(req.body.contact_phone).toBeNull();
+    });
+
+    test('passes with partial contact fields', () => {
+      const { req, res, next } = mockReqRes({
+        ...validBody,
+        contact_name: 'Alice',
+        contact_email: undefined,
+        contact_phone: undefined,
+      });
+      validateInstitutionInput(req, res, next);
+      expect(next).toHaveBeenCalled();
+      expect(req.body.contact_name).toBe('Alice');
+      expect(req.body.contact_email).toBeNull();
+      expect(req.body.contact_phone).toBeNull();
+    });
+
+    test('trims and sets contact fields when provided', () => {
+      const { req, res, next } = mockReqRes({
+        ...validBody,
+        contact_name: '  Alice  ',
+        contact_email: '  alice@test.com  ',
+        contact_phone: '  +91-9999999999  ',
+      });
+      validateInstitutionInput(req, res, next);
+      expect(next).toHaveBeenCalled();
+      expect(req.body.contact_name).toBe('Alice');
+      expect(req.body.contact_email).toBe('alice@test.com');
+      expect(req.body.contact_phone).toBe('+91-9999999999');
+    });
+  });
+
   describe('multiple validation errors', () => {
-    test('returns all validation errors at once', () => {
+    test('returns all validation errors at once (contact fields no longer cause errors)', () => {
       const { req, res, next } = mockReqRes({
         name: 'X',
         institution_type: '',
@@ -231,11 +302,20 @@ describe('validateInstitutionInput', () => {
         surface_types: [],
         hygiene_standard: 'bogus',
         budget: '',
+        contact_name: '',
+        contact_email: 'bad',
+        contact_phone: '',
       });
       validateInstitutionInput(req, res, next);
       expect(res.status).toHaveBeenCalledWith(400);
       const details = res.json.mock.calls[0][0].details;
-      expect(details.length).toBeGreaterThanOrEqual(3);
+      // Expect errors only for name, institution_type, area_size, surface_types, hygiene, budget
+      // Contact fields are now optional so they should NOT produce error entries
+      expect(details.length).toBeGreaterThanOrEqual(6);
+      expect(details.length).toBeLessThanOrEqual(6);
+      // Verify contact fields don't appear in the errors
+      const allErrors = details.join(' ').toLowerCase();
+      expect(allErrors).not.toContain('contact');
     });
   });
 });

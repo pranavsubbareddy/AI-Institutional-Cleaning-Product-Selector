@@ -1,9 +1,11 @@
-require('dotenv').config();
+require('dotenv').config({ override: true });
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 const { v4: uuidv4 } = require('uuid');
-const { generateRecommendation, PRODUCT_KNOWLEDGE_BASE } = require('./src/engine/recommendationEngine');
+const { PRODUCT_KNOWLEDGE_BASE } = require('./src/engine/recommendationEngine');
+const { generateRecommendations } = require('./src/engine/geminiService');
+const persistence = require('./persistence');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -16,7 +18,15 @@ const INST = [];
 const RECS = [];
 const ITEMS = []; // Recommendation items stored separately
 const PRODUCTS = PRODUCT_KNOWLEDGE_BASE.products;
+
+// Load persisted data from disk (if any)
+persistence.init(INST, RECS, ITEMS);
 const SKU = {'prod-gpc-001':'GPC-5L-001','prod-dsf-002':'HDS-5L-002','prod-gls-003':'GLS-5L-003','prod-flr-004':'FLR-5L-004','prod-crp-005':'CRP-5L-005','prod-stl-006':'STL-5L-006','prod-wpd-007':'WPD-5L-007','prod-tlt-008':'TLT-5L-008','prod-hnd-009':'HND-5L-009','prod-hdd-010':'HDD-5L-010','prod-bio-011':'BIO-5L-011','prod-air-012':'AIR-5L-012'};
+
+// Root — return a success message so the browser doesn't show a 404
+app.get('/', (req, res) => {
+  res.json({success:true,message:'AI Institutional Cleaning Product Selector API',version:'1.0.0',endpoints:['/api/health','/api/products','/api/institutions','/api/recommendations','/api/dashboard'],timestamp:new Date().toISOString()});
+});
 
 // Health
 app.get('/api/health', (req, res) => res.json({success:true,message:'API Running',version:'1.0.0',timestamp:new Date().toISOString()}));
@@ -37,15 +47,16 @@ app.get('/api/products/:id', (req, res) => {
 
 // Institutions
 app.post('/api/institutions', (req, res) => {
-  const {name,institution_type,area_size,surface_types,hygiene_standard,budget,contact_name,contact_email,contact_phone,address} = req.body;
+  const {name,institution_type,area_size,surface_types,hygiene_standard,budget,contact_name,contact_email,contact_phone,address,metadata} = req.body;
   const errs = [];
   if(!name||name.trim().length<2) errs.push('Name required (min 2)');
-  if(!['hospital','school','hotel','office','restaurant','factory','warehouse','retail'].includes(institution_type)) errs.push('Invalid type');
+  if(!['hospital','school','hotel','office','restaurant','factory','warehouse','retail','gym','laboratory','pharmacy','airport','shopping_mall','cinema','library','community_center'].includes(institution_type)) errs.push('Invalid type');
   if(!area_size||isNaN(Number(area_size))||Number(area_size)<=0) errs.push('Area must be positive');
   if(!surface_types||!Array.isArray(surface_types)||surface_types.length===0) errs.push('Surface types required');
+  // Contact fields are now required
   if(errs.length) return res.status(400).json({success:false,error:'Validation failed',details:errs,timestamp:new Date().toISOString()});
 
-  const i = {id:uuidv4(),name:name.trim(),institution_type,area_size:Number(area_size),surface_types,hygiene_standard:hygiene_standard||'standard',budget:budget||'medium',contact_name:contact_name||null,contact_email:contact_email||null,contact_phone:contact_phone||null,address:address||null,status:'active',created_at:new Date().toISOString(),updated_at:new Date().toISOString()};
+  const i = {id:uuidv4(),name:name.trim(),institution_type,area_size:Number(area_size),surface_types,hygiene_standard:hygiene_standard||'standard',budget:budget||'medium',contact_name:contact_name?contact_name.trim():null,contact_email:contact_email?contact_email.trim():null,contact_phone:contact_phone?contact_phone.trim():null,address:address||null,metadata:metadata||null,status:'active',created_at:new Date().toISOString(),updated_at:new Date().toISOString()};
   INST.push(i);
   res.status(201).json({success:true,message:'Created',data:i,timestamp:new Date().toISOString()});
 });
@@ -66,14 +77,16 @@ app.get('/api/institutions/:id', (req, res) => {
 app.put('/api/institutions/:id', (req, res) => {
   const idx = INST.findIndex(x => x.id === req.params.id);
   if(idx===-1) return res.status(404).json({success:false,error:'Not found',timestamp:new Date().toISOString()});
-  ['name','institution_type','area_size','surface_types','hygiene_standard','budget','contact_name','contact_email','contact_phone','address','status'].forEach(k => {if(req.body[k]!==undefined) INST[idx][k]=req.body[k]});
+  ['name','institution_type','area_size','surface_types','hygiene_standard','budget','contact_name','contact_email','contact_phone','address','metadata','status'].forEach(k => {if(req.body[k]!==undefined) INST[idx][k]=req.body[k]});
   INST[idx].updated_at = new Date().toISOString();
+  persistence.saveNow();
   res.json({success:true,message:'Updated',data:INST[idx],timestamp:new Date().toISOString()});
 });
 app.delete('/api/institutions/:id', (req, res) => {
   const idx = INST.findIndex(x => x.id === req.params.id);
   if(idx===-1) return res.status(404).json({success:false,error:'Not found',timestamp:new Date().toISOString()});
   INST.splice(idx,1);
+  // save is handled by the monkey-patched splice
   res.json({success:true,message:'Deleted',timestamp:new Date().toISOString()});
 });
 
@@ -85,16 +98,49 @@ app.post('/api/recommendations/process', async (req, res, next) => {
     const i = INST.find(x => x.id === institutionId);
     if(!i) return res.status(404).json({success:false,error:'Not found',timestamp:new Date().toISOString()});
 
-    const result = generateRecommendation({institution_type:i.institution_type,area_size:i.area_size,surface_types:i.surface_types,hygiene_standard:i.hygiene_standard,budget:i.budget});
-    const rid = uuidv4();
-    const items = result.items.map(item => ({id:uuidv4(),recommendation_id:rid,product_id:item.product_id,product_name:item.product_name,category:item.category,sku:SKU[item.product_id]||item.product_id,quantity_estimate:item.quantity_estimate,unit:item.unit,dilution_ratio:item.dilution_ratio,monthly_cost:item.monthly_cost,unit_price:item.unit_price,coverage_per_unit:item.coverage_per_unit,usage_frequency:item.usage_frequency,priority:item.priority,usage_guidance:item.usage_guidance,safety_notes:item.safety_notes,base_price:item.unit_price}));
+    // Build full institution object with parsed metadata
+    const institution = {
+      institution_type: i.institution_type,
+      area_size: i.area_size,
+      surface_types: i.surface_types,
+      hygiene_standard: i.hygiene_standard,
+      budget: i.budget,
+      metadata: i.metadata || {}
+    };
 
-    const rec = {id:rid,institution_id:i.id,status:'Processed',total_estimated_cost:result.total_estimated_cost,monthly_total_quantity:result.monthly_total_quantity,summary:result.summary,alerts:JSON.stringify(result.alerts),source:'Rule_Engine',owner:'system',processed_at:new Date().toISOString(),created_at:new Date().toISOString(),updated_at:new Date().toISOString()};
+    const rid = uuidv4();
+    let source = 'AI_Engine';
+    let items;
+    let totalCost;
+    let totalQty;
+    let alertsArr;
+    let summaryText;
+
+    // Use only API key-based AI recommendations (no fallback)
+    console.log('  Attempting AI Engine for recommendations...');
+    const aiResult = await generateRecommendations(institution);
+
+    if (aiResult && aiResult.recommendations && aiResult.recommendations.length > 0) {
+      console.log('  [OK] Using AI-generated recommendations (' + aiResult.recommendations.length + ' products)');
+      items = aiResult.recommendations.map(item => {
+        const product = PRODUCT_KNOWLEDGE_BASE.products.find(p => p.id === item.productId || p.name === item.name);
+        return {id:uuidv4(),recommendation_id:rid,product_id:item.productId || item.sku,product_name:item.name,category:product?.category||'General',sku:item.sku||item.productId,quantity_estimate:item.estimated_monthly_qty_units||0,unit:product?.unit||'litre',dilution_ratio:item.recommended_dilution||product?.dilution_ratio||null,monthly_cost:item.calculated_cost||0,unit_price:product?.unit_price||0,coverage_per_unit:product?.coverage_per_unit||0,usage_frequency:'Monthly',priority:1,usage_guidance:item.usage_guidance||product?.usage_guidance||null,safety_notes:item.safety_notes||product?.safety_notes||null,base_price:product?.unit_price||0};
+      });
+      totalCost = aiResult.summary?.grossAggregatedCost || items.reduce((s, it) => s + (it.monthly_cost || 0), 0);
+      totalQty = items.reduce((s, it) => s + (it.quantity_estimate || 0), 0);
+      alertsArr = aiResult.summary?.financialStatusAlert ? [aiResult.summary.financialStatusAlert] : [];
+      summaryText = `Recommended ${items.length} products for ${i.institution_type} facility of ${i.area_size} sq. ft. Monthly cost: Rs ${totalCost.toLocaleString('en-IN')}.`;
+    } else {
+      // API key is required — no fallback to rule engine
+      console.log('  AI Engine unavailable. Please configure valid API key.');
+      return res.status(503).json({success:false,error:'AI Engine is unavailable. Please ensure a valid OpenAI or Gemini API key is configured. Only AI-generated recommendations are supported.',details:'Recommendations can only be generated from OpenAI or Gemini. Default/rule-based recommendations have been disabled.',timestamp:new Date().toISOString()});
+    }
+
+    const rec = {id:rid,institution_id:i.id,status:'Processed',total_estimated_cost:totalCost,monthly_total_quantity:totalQty,summary:summaryText,alerts:JSON.stringify(alertsArr),source,owner:'system',processed_at:new Date().toISOString(),created_at:new Date().toISOString(),updated_at:new Date().toISOString()};
     RECS.push(rec);
-    // Store items separately so they can be retrieved by ID
     items.forEach(item => ITEMS.push(item));
 
-    res.status(201).json({success:true,message:'Processed',data:{recommendation:{...rec,alerts:result.alerts},items,institution_id:i.id,institution_name:i.name,summary:result.summary,grossAggregatedCost:result.total_estimated_cost,financialStatusAlert:result.alerts.length>0?result.alerts.join('; '):null},timestamp:new Date().toISOString()});
+    res.status(201).json({success:true,message:'Processed',data:{recommendation:{...rec,alerts:alertsArr},items,institution_id:i.id,institution_name:i.name,summary:summaryText,grossAggregatedCost:totalCost,financialStatusAlert:alertsArr.length>0?alertsArr.join('; '):null,engine_source:source},timestamp:new Date().toISOString()});
   } catch(e) { next(e); }
 });
 
@@ -109,13 +155,11 @@ app.get('/api/recommendations/:id', (req, res) => {
   const rec = RECS.find(r=>r.id===req.params.id);
   if(!rec) return res.status(404).json({success:false,error:'Not found',timestamp:new Date().toISOString()});
   const inst = INST.find(i=>i.id===rec.institution_id);
-  // Retrieve stored items, or regenerate from the recommendation engine if none found
+  // Retrieve stored items from database
   let items = ITEMS.filter(item => item.recommendation_id === req.params.id);
-  if (items.length === 0 && inst) {
-    // Re-compute using the engine
-    const result = generateRecommendation({institution_type:inst.institution_type,area_size:inst.area_size,surface_types:inst.surface_types,hygiene_standard:inst.hygiene_standard,budget:inst.budget});
-    items = result.items.map(item => ({id:uuidv4(),recommendation_id:req.params.id,product_id:item.product_id,product_name:item.product_name,category:item.category,sku:SKU[item.product_id]||item.product_id,quantity_estimate:item.quantity_estimate,unit:item.unit,dilution_ratio:item.dilution_ratio,monthly_cost:item.monthly_cost,unit_price:item.unit_price,coverage_per_unit:item.coverage_per_unit,usage_frequency:item.usage_frequency,priority:item.priority,usage_guidance:item.usage_guidance,safety_notes:item.safety_notes,base_price:item.unit_price}));
-    items.forEach(item => ITEMS.push(item));
+  if (items.length === 0) {
+    // No items found — recommendation was generated but not stored
+    console.warn(`No items found for recommendation ${req.params.id}. Database may be corrupted.`);
   }
   res.json({success:true,data:{...rec,institution_name:inst?.name||'Unknown',institution_type:inst?.institution_type||'unknown',area_size:inst?.area_size||0,hygiene_standard:inst?.hygiene_standard||'standard',budget:inst?.budget||'medium',surface_types:inst?.surface_types||[],alerts:JSON.parse(rec.alerts||'[]'),items},timestamp:new Date().toISOString()});
 });

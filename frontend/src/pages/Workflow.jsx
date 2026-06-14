@@ -28,6 +28,15 @@ export default function Workflow() {
     },
     {
       step: 4,
+      title: 'Email Confirmation & Report',
+      description: 'A detailed recommendation report is automatically sent to the facility contact email address you provide. The email includes a summary, product table with quantities and pricing, cost breakdown, and any important alerts.',
+      link: '/form',
+      icon: 'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
+      color: 'cyan',
+      isEmail: true
+    },
+    {
+      step: 5,
       title: 'View Recommendations',
       description: 'Review AI-generated product suggestions with quantities, cost breakdowns, dilution ratios, usage guidance, and safety information.',
       link: '/dashboard',
@@ -35,14 +44,14 @@ export default function Workflow() {
       color: 'cyan'
     },
     {
-      step: 5,
+      step: 6,
       title: 'Generate & Copy Quotation',
       description: 'Generate a comprehensive quotation summary with all product details. Copy to clipboard with one click for your records or procurement process.',
       icon: 'M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z',
       color: 'emerald'
     },
     {
-      step: 6,
+      step: 7,
       title: 'Place Order',
       description: 'Contact the Ganga Maxx sales team to place your order. Leverage negotiated contract pricing and tier discounts for your institution.',
       icon: 'M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z',
@@ -104,6 +113,28 @@ export default function Workflow() {
                       <p className="text-sm text-surface-300 leading-relaxed">
                         <span className="text-emerald-400 font-medium">How it works:</span> Our recommendation engine uses a sophisticated scoring algorithm that matches your facility type, surface requirements, hygiene standards, and budget against our comprehensive product database of Ganga Maxx cleaning products. The AI system weighs factors like surface compatibility, dilution efficiency, safety compliance, and cost optimization to generate the most suitable product mix.
                       </p>
+                    </div>
+                  )}
+
+                  {item.isEmail && (
+                    <div className="mt-4 p-5 bg-gradient-to-r from-cyan-500/5 to-cyan-500/10 rounded-xl border border-cyan-500/20">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center">
+                          <svg className="w-4 h-4 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                        <span className="text-sm font-medium text-cyan-400">Email Delivery</span>
+                      </div>
+                      <div className="text-sm text-surface-300 space-y-2">
+                        <p><span className="text-emerald-400 font-medium">Automated delivery:</span> Once the AI generates recommendations, an email is sent automatically to the contact email provided in the form. No manual action needed.</p>
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          <span className="badge bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-[11px]">📋 Full product table with pricing</span>
+                          <span className="badge bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-[11px]">💰 Monthly cost breakdown</span>
+                          <span className="badge bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-[11px]">⚠️ Important alerts & notes</span>
+                          <span className="badge bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-[11px]">🏢 Facility profile summary</span>
+                        </div>
+                      </div>
                     </div>
                   )}
                   

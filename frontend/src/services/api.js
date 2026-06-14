@@ -11,12 +11,29 @@ async function fetchApi(endpoint, options = {}) {
   
   try {
     const response = await fetch(url, config);
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.error || data.details || 'Request failed');
+    const text = await response.text();
+    let data = null;
+
+    if (text) {
+      try {
+        data = JSON.parse(text);
+      } catch {
+        const message = response.ok
+          ? 'Server returned an invalid response. Please try again.'
+          : `Server returned ${response.status} ${response.statusText || 'error'} instead of JSON.`;
+        throw new Error(message);
+      }
     }
     
+    if (!response.ok) {
+      const details = Array.isArray(data?.details) ? data.details.join(', ') : data?.details;
+      throw new Error(data?.error || details || `Request failed (${response.status})`);
+    }
+    
+    if (!data) {
+      throw new Error('Server returned an empty response. Please try again.');
+    }
+
     return data;
   } catch (error) {
     if (error.message === 'Failed to fetch') {
@@ -105,7 +122,15 @@ export const INSTITUTION_TYPES = [
   { value: 'restaurant', label: 'Restaurant / Food Service', icon: '🍽️' },
   { value: 'factory', label: 'Factory / Industrial', icon: '🏭' },
   { value: 'warehouse', label: 'Warehouse / Storage', icon: '📦' },
-  { value: 'retail', label: 'Retail / Store', icon: '🛍️' }
+  { value: 'retail', label: 'Retail / Store', icon: '🛍️' },
+  { value: 'gym', label: 'Gym / Fitness Center', icon: '💪' },
+  { value: 'laboratory', label: 'Laboratory / Research', icon: '🔬' },
+  { value: 'pharmacy', label: 'Pharmacy / Medical Store', icon: '💊' },
+  { value: 'airport', label: 'Airport / Transportation', icon: '✈️' },
+  { value: 'shopping_mall', label: 'Shopping Mall / Complex', icon: '🏬' },
+  { value: 'cinema', label: 'Cinema / Theater', icon: '🎬' },
+  { value: 'library', label: 'Library / Study Center', icon: '📚' },
+  { value: 'community_center', label: 'Community Center / Hall', icon: '🏛️' }
 ];
 
 export const SURFACE_TYPES = [

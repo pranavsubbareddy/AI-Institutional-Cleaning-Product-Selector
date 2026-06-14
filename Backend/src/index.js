@@ -70,7 +70,7 @@ async function startServer() {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n=============================================`);
     console.log('  AI Institutional Cleaning Product Selector');
-    console.log('      API Server - Ganga Maxx');
+    console.log('      AI Institutional Cleaning Product Selector API');
     console.log('=============================================');
     console.log('  Server:');
     console.log(`  http://localhost:${PORT}`);
