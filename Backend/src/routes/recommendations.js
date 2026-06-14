@@ -4,6 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const { body, validationResult } = require('express-validator');
 const { queryAll, queryOne, run } = require('../database/schema');
 const { generateRecommendations } = require('../engine/geminiService');
+const { generateRecommendation } = require('../engine/recommendationEngine');
 const { MOCK_PRODUCT_CATALOG } = require('../engine/productCatalog');
 
 // ---------------------------------------------------------------------------
@@ -132,9 +133,125 @@ router.post('/process', validateProcessBody, async (req, res, next) => {
     const aiResult = await generateRecommendations(institution);
 
     if (!aiResult || !aiResult.recommendations || aiResult.recommendations.length === 0) {
-      return res.status(503).json({
-        success: false,
-        error: 'AI Engine is unavailable. Please ensure a valid OpenAI or Gemini API key is configured. Only AI-generated recommendations are supported.',
+      // Fallback to rule-based recommendations
+      console.log('  AI Engine unavailable. Falling back to rule-based recommendations...');
+      const ruleResult = generateRecommendation(institution);
+
+      if (!ruleResult || !ruleResult.items || ruleResult.items.length === 0) {
+        return res.status(503).json({
+          success: false,
+          error: 'AI Engine is unavailable. Please ensure a valid OpenAI or Gemini API key is configured. Only AI-generated recommendations are supported.',
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      console.log('  [OK] Using rule-based recommendations (' + ruleResult.items.length + ' products)');
+
+      // Build SKU lookups from DB products and hardcoded catalog for fallback
+      const catalogBySku = {};
+      try {
+        MOCK_PRODUCT_CATALOG.forEach(p => { catalogBySku[p.sku] = p; });
+      } catch (e) {
+        console.warn('[recommendations] productCatalog not available for SKU fallback');
+      }
+
+      const allProducts = await queryAll('SELECT id, COALESCE(sku, id) as identifier FROM products');
+      const productIdByIdentifier = {};
+      allProducts.forEach(p => { productIdByIdentifier[p.identifier] = p.id; });
+
+      // Save recommendation record
+      const ruleRecId = uuidv4();
+      const ruleAlerts = ruleResult.alerts || [];
+
+      const ruleTotalMonthlyQty = ruleResult.monthly_total_quantity || 0;
+
+      const ruleSummary = ruleResult.summary || `Recommended ${ruleResult.items.length} products for ${institution.institution_type} facility of ${institution.area_size} sq. ft. ` +
+        `Monthly cost: Rs ${(ruleResult.total_estimated_cost || 0).toLocaleString('en-IN')}.`;
+
+      await run(
+        `INSERT INTO recommendations (id, institution_id, status, total_estimated_cost, monthly_total_quantity, summary, alerts, source, owner, processed_at)
+         VALUES (?, ?, 'Processed', ?, ?, ?, ?, 'Rule_Engine', 'system', NOW())`,
+        [
+          ruleRecId, institution.id,
+          ruleResult.total_estimated_cost || 0,
+          ruleTotalMonthlyQty, ruleSummary,
+          JSON.stringify(ruleAlerts)
+        ]
+      );
+
+      // Save recommendation line items
+      await Promise.all(ruleResult.items.map(async (item) => {
+        const lineId = uuidv4();
+        const pid = item.product_id || '';
+        const productId = productIdByIdentifier[pid] || pid;
+        await run(
+          `INSERT INTO recommendation_items
+           (id, recommendation_id, product_id, quantity_estimate, dilution_ratio,
+            monthly_cost, usage_frequency, priority, usage_guidance, safety_notes)
+           VALUES (?, ?, ?, ?, ?, ?, 'Monthly', ?, ?, ?)`,
+          [
+            lineId, ruleRecId, productId,
+            item.quantity_estimate, item.dilution_ratio,
+            item.monthly_cost, item.priority || 1,
+            item.usage_guidance || null,
+            item.safety_notes || null
+          ]
+        );
+      }));
+
+      // Fetch saved recommendation
+      const [recommendation, items] = await Promise.all([
+        queryOne('SELECT * FROM recommendations WHERE id = ?', [ruleRecId]),
+        queryAll(
+          `SELECT ri.*, p.name as product_name, p.category, p.safety_notes, p.usage_guidance,
+                  p.unit, p.coverage_per_unit, p.unit_price as base_price
+           FROM recommendation_items ri
+           LEFT JOIN products p ON ri.product_id = p.id
+           WHERE ri.recommendation_id = ?
+           ORDER BY ri.priority ASC`, [ruleRecId])
+      ]);
+
+      const responseItems = items.length > 0
+        ? items.map(dbItem => ({
+            ...dbItem,
+            product_name: dbItem.product_name
+              || catalogBySku[dbItem.product_id]?.name
+              || ruleResult.items.find(i => i.product_id === dbItem.product_id)?.product_name
+              || 'Unknown Product',
+            usage_guidance: dbItem.usage_guidance || null,
+            safety_notes: dbItem.safety_notes || null
+          }))
+        : ruleResult.items.map(r => ({
+            product_name: r.product_name,
+            product_id: r.product_id,
+            quantity_estimate: r.quantity_estimate,
+            dilution_ratio: r.dilution_ratio,
+            monthly_cost: r.monthly_cost,
+            usage_guidance: r.usage_guidance,
+            safety_notes: r.safety_notes
+          }));
+
+      return res.status(201).json({
+        success: true,
+        message: 'Recommendation processed successfully (rule-based)',
+        data: {
+          recommendation: {
+            ...recommendation,
+            alerts: JSON.parse(recommendation?.alerts || '[]'),
+            source: 'Rule_Engine',
+            status: 'Processed',
+            owner: 'system',
+            processed_at: new Date().toISOString()
+          },
+          items: responseItems,
+          institution_id: institution.id,
+          institution_name: institution.name,
+          summary: ruleSummary,
+          source: 'Rule_Engine',
+          isFallback: true,
+          grossAggregatedCost: ruleResult.total_estimated_cost || 0,
+          financialStatusAlert: ruleResult.alerts?.[0] || null
+        },
         timestamp: new Date().toISOString()
       });
     }

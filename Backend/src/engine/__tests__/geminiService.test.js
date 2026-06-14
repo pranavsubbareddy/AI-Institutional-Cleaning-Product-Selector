@@ -1,29 +1,9 @@
 const {
   generateRecommendations,
-  getAIClient,
   getOpenAIKeyCandidates,
   getGeminiKeyCandidates,
   extractJSON,
 } = require('../geminiService');
-
-// Mock OpenAI to avoid needing fetch in jsdom test environment
-jest.mock('openai', () => {
-  return jest.fn().mockImplementation(() => ({
-    chat: {
-      completions: {
-        create: jest.fn(),
-      },
-    },
-  }));
-});
-
-jest.mock('@google/genai', () => ({
-  GoogleGenAI: jest.fn().mockImplementation(() => ({
-    models: {
-      generateContent: jest.fn(),
-    },
-  })),
-}));
 
 // ---------------------------------------------------------------------------
 // Helper: create base institution params
@@ -49,56 +29,8 @@ function clearAIKeys() {
 }
 
 // ---------------------------------------------------------------------------
-// 1. getAIClient TESTS (isolated to avoid singleton issues)
+// 1. getOpenAIKeyCandidates TESTS
 // ---------------------------------------------------------------------------
-describe('getAIClient', () => {
-  const OLD_ENV = process.env;
-
-  afterAll(() => {
-    process.env = OLD_ENV;
-  });
-
-  function getIsolatedAIClient() {
-    let result;
-    jest.isolateModules(() => {
-      const mod = require('../geminiService');
-      result = mod.getAIClient();
-    });
-    return result;
-  }
-
-  test('returns null when no API key is set', () => {
-    clearAIKeys();
-    expect(getIsolatedAIClient()).toBeNull();
-  });
-
-  test('returns null when API key is placeholder value', () => {
-    clearAIKeys();
-    process.env.OPENAI_API_KEY = 'invalid-key-format';
-    expect(getIsolatedAIClient()).toBeNull();
-  });
-
-  test('reads OPENAI_API_KEY env var', () => {
-    clearAIKeys();
-    process.env.OPENAI_API_KEY = 'sk-proj-test-key-123';
-    const client = getIsolatedAIClient();
-    expect(client).not.toBeNull();
-  });
-
-  test('reads OPENAI_KEY as fallback', () => {
-    clearAIKeys();
-    process.env.OPENAI_KEY = 'sk-proj-fallback-key-456';
-    expect(getIsolatedAIClient()).not.toBeNull();
-  });
-
-  test('prefers OPENAI_API_KEY over OPENAI_KEY', () => {
-    clearAIKeys();
-    process.env.OPENAI_API_KEY = 'sk-proj-primary-key';
-    process.env.OPENAI_KEY = 'sk-proj-fallback-key';
-    expect(getIsolatedAIClient()).not.toBeNull();
-  });
-});
-
 describe('getOpenAIKeyCandidates', () => {
   const OLD_ENV = process.env;
 

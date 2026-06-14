@@ -23,11 +23,9 @@ function setAuthState(overrides) {
     user: null,
     signIn: jest.fn().mockResolvedValue(undefined),
     signUp: jest.fn().mockResolvedValue(undefined),
-    signInWithGoogle: jest.fn().mockResolvedValue(undefined),
     logout: jest.fn().mockResolvedValue(undefined),
     isAuthenticated: false,
     loading: false,
-    firebaseAvailable: false,
   };
   mockUseAuth.mockReturnValue({ ...defaults, ...overrides });
 }

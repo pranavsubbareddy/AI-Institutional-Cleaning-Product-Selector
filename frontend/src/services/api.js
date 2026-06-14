@@ -6,6 +6,7 @@ async function fetchApi(endpoint, options = {}) {
   const url = `${API_BASE}${endpoint}`;
   const config = {
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     ...options
   };
   
@@ -82,6 +83,12 @@ export const api = {
     return fetchApi(`/recommendations${query ? `?${query}` : ''}`);
   },
   getRecommendation: (id) => fetchApi(`/recommendations/${id}`),
+
+  // Auth
+  signup: (data) => fetchApi('/auth/signup', { method: 'POST', body: JSON.stringify(data) }),
+  login: (data) => fetchApi('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
+  logout: () => fetchApi('/auth/logout', { method: 'POST' }),
+  getMe: () => fetchApi('/auth/me'),
 
   // Dashboard
   getDashboardStats: () => fetchApi('/dashboard/stats'),

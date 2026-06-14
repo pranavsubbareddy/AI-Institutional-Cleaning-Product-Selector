@@ -1,9 +1,30 @@
-const OpenAI = require('openai');
-const { GoogleGenAI } = require('@google/genai');
+const { ChatOpenAI } = require('@langchain/openai');
+const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
+const { z } = require('zod');
 
-const aiClients = new Map();
-const geminiClients = new Map();
+// ── Zod schema for structured output ──────────────────────────────────
+const RecommendationSchema = z.object({
+  recommendations: z
+    .array(
+      z.object({
+        productId: z.string().describe('Must match one of the catalog product IDs exactly'),
+        sku: z.string().describe('Product SKU code'),
+        name: z.string().describe('Exact catalog product name'),
+        recommended_dilution: z.string().describe('Dilution ratio or "Ready to use"'),
+        estimated_monthly_qty_units: z.number().describe('Estimated monthly quantity in units'),
+        calculated_cost: z.number().describe('Calculated monthly cost in INR'),
+        usage_guidance: z.string().describe('How to use the product'),
+        safety_notes: z.string().describe('Safety precautions'),
+      })
+    )
+    .describe('Array of 3-8 recommended products'),
+  summary: z.object({
+    grossAggregatedCost: z.number().describe('Total monthly cost of all recommended products in INR'),
+    financialStatusAlert: z.string().nullable().describe('Budget/financial alert message or null'),
+  }),
+});
 
+// ── Key validation ────────────────────────────────────────────────────
 function isValidOpenAIKey(apiKey) {
   return typeof apiKey === 'string' && apiKey.trim().startsWith('sk-');
 }
@@ -22,6 +43,7 @@ function splitKeyList(value) {
     .filter(Boolean);
 }
 
+// ── Key discovery ─────────────────────────────────────────────────────
 function getOpenAIKeyCandidates() {
   const keys = [
     ...splitKeyList(process.env.OPENAI_API_KEYS),
@@ -34,8 +56,7 @@ function getOpenAIKeyCandidates() {
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
     .forEach(name => keys.push(...splitKeyList(process.env[name])));
 
-  // Some deployments used Gemini variable names while pasting OpenAI keys.
-  // Accept those only when the value is clearly an OpenAI key.
+  // Accept Gemini env names only when the value is clearly an OpenAI key
   [
     process.env.GEMINI_API_KEY,
     process.env.GEMINI_API_KEYS,
@@ -62,36 +83,44 @@ function getGeminiKeyCandidates() {
   return [...new Set(keys.filter(isValidGeminiKey))];
 }
 
-function getAIClient(apiKey) {
-  const keys = apiKey ? [apiKey] : getOpenAIKeyCandidates();
-  const selectedKey = keys[0];
+// ── Model cache ───────────────────────────────────────────────────────
+const modelCache = new Map();
 
-  if (!selectedKey) {
-    return null;
+function getStructuredModel(key, provider) {
+  const cacheKey = `${provider}:${key}`;
+  if (modelCache.has(cacheKey)) return modelCache.get(cacheKey);
+
+  let model;
+  if (provider === 'openai') {
+    const chatModel = new ChatOpenAI({
+      apiKey: key,
+      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+      temperature: 0.7,
+      maxTokens: 4096,
+    });
+    model = chatModel.withStructuredOutput(RecommendationSchema, {
+      name: 'recommendation',
+    });
+  } else {
+    const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+    const chatModel = new ChatGoogleGenerativeAI({
+      apiKey: key,
+      model: geminiModel,
+      temperature: 0.4,
+      maxOutputTokens: 4096,
+    });
+    model = chatModel.withStructuredOutput(RecommendationSchema, {
+      name: 'recommendation',
+    });
   }
 
-  if (!aiClients.has(selectedKey)) {
-    aiClients.set(selectedKey, new OpenAI({ apiKey: selectedKey, dangerouslyAllowBrowser: true }));
-  }
-
-  return aiClients.get(selectedKey);
-}
-
-function getGeminiClient(apiKey) {
-  if (!apiKey) {
-    return null;
-  }
-
-  if (!geminiClients.has(apiKey)) {
-    geminiClients.set(apiKey, new GoogleGenAI({ apiKey }));
-  }
-
-  return geminiClients.get(apiKey);
+  modelCache.set(cacheKey, model);
+  return model;
 }
 
 /**
- * Generate recommendations using OpenAI.
- * Returns null if the AI call fails or is not configured — never falls back silently.
+ * Generate recommendations using LangChain (OpenAI or Gemini).
+ * Returns null if no API key is configured or all providers fail.
  * @param {Object} params - { institution_type, area_size, surface_types, hygiene_standard, budget, metadata }
  * @returns {Object|null} { recommendations: [...], summary: {...} } or null
  */
@@ -106,109 +135,58 @@ async function generateRecommendations(params) {
 
   const catalog = getCatalogForPrompt();
   const prompt = buildPrompt(params, catalog);
-  const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 
+  // Try OpenAI keys first
   if (apiKeys.length > 0) {
-    console.log(`  Using OpenAI for recommendations with ${apiKeys.length} configured key(s)...`);
-    console.log('  OpenAI model:', model);
-  }
+    console.log(`  Using LangChain OpenAI with ${apiKeys.length} configured key(s)...`);
+    console.log('  OpenAI model:', process.env.OPENAI_MODEL || 'gpt-4o-mini');
 
-  for (let index = 0; index < apiKeys.length; index += 1) {
-    const client = getAIClient(apiKeys[index]);
+    for (let index = 0; index < apiKeys.length; index += 1) {
+      try {
+        console.log(`  Trying OpenAI API key ${index + 1}/${apiKeys.length}...`);
+        const structuredModel = getStructuredModel(apiKeys[index], 'openai');
+        const result = await structuredModel.invoke(prompt);
 
-    try {
-      console.log(`  Trying OpenAI API key ${index + 1}/${apiKeys.length}...`);
+        if (result && result.recommendations && result.recommendations.length > 0 && result.summary) {
+          console.log('  OpenAI success —', result.recommendations.length, 'products recommended');
+          return result;
+        }
 
-      const result = await client.chat.completions.create({
-        model,
-        messages: [
-          { role: 'system', content: 'You are an expert Industrial Chemist and Procurement Auditor for institutional cleaning products. You must respond with valid JSON only.' },
-          { role: 'user', content: prompt }
-        ],
-        temperature: 0.7,
-        max_tokens: 4096,
-        response_format: { type: 'json_object' }
-      });
-
-      const text = result?.choices?.[0]?.message?.content;
-
-      if (!text) {
-        console.warn('  OpenAI returned empty response. Finish reason:', result?.choices?.[0]?.finish_reason || 'unknown');
-        continue;
-      }
-
-      const parsed = extractJSON(text);
-      if (parsed && parsed.recommendations && Array.isArray(parsed.recommendations) && parsed.recommendations.length > 0 && parsed.summary) {
-        console.log('  OpenAI success —', parsed.recommendations.length, 'products recommended');
-        return parsed;
-      }
-
-      console.warn('  OpenAI returned invalid/malformed JSON. Raw response (first 500 chars):', text.substring(0, 500));
-    } catch (error) {
-      const status = error.status || error.code || 'unknown';
-      if (status === 429) {
-        console.warn(`  ⛔ RATE LIMIT on OpenAI key ${index + 1}/${apiKeys.length}. Rotating to next key...`);
-      } else {
-        console.warn(`  OpenAI key ${index + 1}/${apiKeys.length} failed (${status}):`, error.message);
-      }
-      if (error.stack && index === apiKeys.length - 1) {
-        console.warn('  Stack:', error.stack.split('\n').slice(0, 4).join('\n'));
+        console.warn('  OpenAI returned invalid/malformed response.');
+      } catch (error) {
+        const status = error.status || error.code || 'unknown';
+        if (status === 429) {
+          console.warn(`  ⛔ RATE LIMIT on OpenAI key ${index + 1}/${apiKeys.length}. Rotating to next key...`);
+        } else {
+          console.warn(`  OpenAI key ${index + 1}/${apiKeys.length} failed (${status}):`, error.message);
+        }
       }
     }
   }
 
-  const geminiModels = [
-    process.env.GEMINI_MODEL,
-    'gemini-2.5-flash',
-    'gemini-2.0-flash',
-  ].filter(Boolean);
-  const uniqueGeminiModels = [...new Set(geminiModels)];
+  // Fallback to Gemini keys
   if (geminiKeys.length > 0) {
-    console.log(`  Using Gemini for recommendations with ${geminiKeys.length} configured key(s)...`);
-    console.log('  Gemini models:', uniqueGeminiModels.join(', '));
-  }
+    console.log(`  Using LangChain Gemini with ${geminiKeys.length} configured key(s)...`);
+    console.log('  Gemini model:', process.env.GEMINI_MODEL || 'gemini-2.0-flash');
 
-  for (let index = 0; index < geminiKeys.length; index += 1) {
-    const client = getGeminiClient(geminiKeys[index]);
-
-    for (const geminiModel of uniqueGeminiModels) {
+    for (let index = 0; index < geminiKeys.length; index += 1) {
       try {
-        console.log(`  Trying Gemini API key ${index + 1}/${geminiKeys.length} with ${geminiModel}...`);
+        console.log(`  Trying Gemini API key ${index + 1}/${geminiKeys.length}...`);
+        const structuredModel = getStructuredModel(geminiKeys[index], 'gemini');
+        const result = await structuredModel.invoke(prompt);
 
-        const result = await client.models.generateContent({
-          model: geminiModel,
-          contents: prompt,
-          config: {
-            systemInstruction: 'You are an expert Industrial Chemist and Procurement Auditor for institutional cleaning products. You must respond with valid JSON only.',
-            temperature: 0.4,
-            maxOutputTokens: 4096,
-            responseMimeType: 'application/json',
-          },
-        });
-
-        const text = result?.text;
-
-        if (!text) {
-          console.warn(`  Gemini ${geminiModel} returned empty response.`);
-          continue;
+        if (result && result.recommendations && result.recommendations.length > 0 && result.summary) {
+          console.log('  Gemini success —', result.recommendations.length, 'products recommended');
+          return result;
         }
 
-        const parsed = extractJSON(text);
-        if (parsed && parsed.recommendations && Array.isArray(parsed.recommendations) && parsed.recommendations.length > 0 && parsed.summary) {
-          console.log('  Gemini success —', parsed.recommendations.length, 'products recommended');
-          return parsed;
-        }
-
-        console.warn(`  Gemini ${geminiModel} returned invalid/malformed JSON. Raw response (first 500 chars):`, text.substring(0, 500));
+        console.warn('  Gemini returned invalid/malformed response.');
       } catch (error) {
         const status = error.status || error.code || 'unknown';
         if (status === 429) {
-          console.warn(`  ⛔ RATE LIMIT on Gemini key ${index + 1}/${geminiKeys.length} with ${geminiModel}. Rotating to next key...`);
+          console.warn(`  ⛔ RATE LIMIT on Gemini key ${index + 1}/${geminiKeys.length}. Rotating to next key...`);
         } else {
-          console.warn(`  Gemini key ${index + 1}/${geminiKeys.length} with ${geminiModel} failed (${status}):`, error.message);
-        }
-        if (error.stack && index === geminiKeys.length - 1 && geminiModel === uniqueGeminiModels[uniqueGeminiModels.length - 1]) {
-          console.warn('  Stack:', error.stack.split('\n').slice(0, 4).join('\n'));
+          console.warn(`  Gemini key ${index + 1}/${geminiKeys.length} failed (${status}):`, error.message);
         }
       }
     }
@@ -443,9 +421,8 @@ function getCatalogForPrompt() {
 
 module.exports = {
   generateRecommendations,
-  getAIClient,
-  getGeminiClient,
   getOpenAIKeyCandidates,
   getGeminiKeyCandidates,
   extractJSON,
+  getStructuredModel,
 };

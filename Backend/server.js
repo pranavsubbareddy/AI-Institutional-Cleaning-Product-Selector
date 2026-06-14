@@ -2,8 +2,9 @@ require('dotenv').config({ override: true });
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
+const cookieParser = require('cookie-parser');
 const { v4: uuidv4 } = require('uuid');
-const { PRODUCT_KNOWLEDGE_BASE } = require('./src/engine/recommendationEngine');
+const { PRODUCT_KNOWLEDGE_BASE, generateRecommendation } = require('./src/engine/recommendationEngine');
 const { generateRecommendations } = require('./src/engine/geminiService');
 const persistence = require('./persistence');
 
@@ -12,6 +13,7 @@ const PORT = process.env.PORT || 5000;
 
 app.use(cors({origin:true,credentials:true}));
 app.use(express.json());
+app.use(cookieParser());
 app.use(morgan('dev'));
 
 const INST = [];
@@ -22,6 +24,9 @@ const PRODUCTS = PRODUCT_KNOWLEDGE_BASE.products;
 // Load persisted data from disk (if any)
 persistence.init(INST, RECS, ITEMS);
 const SKU = {'prod-gpc-001':'GPC-5L-001','prod-dsf-002':'HDS-5L-002','prod-gls-003':'GLS-5L-003','prod-flr-004':'FLR-5L-004','prod-crp-005':'CRP-5L-005','prod-stl-006':'STL-5L-006','prod-wpd-007':'WPD-5L-007','prod-tlt-008':'TLT-5L-008','prod-hnd-009':'HND-5L-009','prod-hdd-010':'HDD-5L-010','prod-bio-011':'BIO-5L-011','prod-air-012':'AIR-5L-012'};
+// ── Auth Routes ─────────────────────────────────────────────────────────
+const authRoutes = require('./src/routes/auth');
+app.use('/api/auth', authRoutes);
 
 // Root — return a success message so the browser doesn't show a 404
 app.get('/', (req, res) => {
@@ -131,9 +136,43 @@ app.post('/api/recommendations/process', async (req, res, next) => {
       alertsArr = aiResult.summary?.financialStatusAlert ? [aiResult.summary.financialStatusAlert] : [];
       summaryText = `Recommended ${items.length} products for ${i.institution_type} facility of ${i.area_size} sq. ft. Monthly cost: Rs ${totalCost.toLocaleString('en-IN')}.`;
     } else {
-      // API key is required — no fallback to rule engine
-      console.log('  AI Engine unavailable. Please configure valid API key.');
-      return res.status(503).json({success:false,error:'AI Engine is unavailable. Please ensure a valid OpenAI or Gemini API key is configured. Only AI-generated recommendations are supported.',details:'Recommendations can only be generated from OpenAI or Gemini. Default/rule-based recommendations have been disabled.',timestamp:new Date().toISOString()});
+      // Fallback to rule-based recommendations
+      console.log('  AI Engine unavailable. Falling back to rule-based recommendations...');
+      const ruleResult = generateRecommendation(institution);
+
+      if (ruleResult && ruleResult.items && ruleResult.items.length > 0) {
+        console.log('  [OK] Using rule-based recommendations (' + ruleResult.items.length + ' products)');
+        source = 'Rule_Engine';
+        items = ruleResult.items.map(item => {
+          const product = PRODUCT_KNOWLEDGE_BASE.products.find(p => p.id === item.product_id);
+          return {
+            id: uuidv4(),
+            recommendation_id: rid,
+            product_id: item.product_id,
+            product_name: item.product_name,
+            category: item.category || product?.category || 'General',
+            sku: SKU[item.product_id] || item.product_id,
+            quantity_estimate: item.quantity_estimate || 0,
+            unit: item.unit || product?.unit || 'litre',
+            dilution_ratio: item.dilution_ratio || product?.dilution_ratio || null,
+            monthly_cost: item.monthly_cost || 0,
+            unit_price: item.unit_price || product?.unit_price || 0,
+            coverage_per_unit: item.coverage_per_unit || product?.coverage_per_unit || 0,
+            usage_frequency: item.usage_frequency || 'Monthly',
+            priority: item.priority || 1,
+            usage_guidance: item.usage_guidance || product?.usage_guidance || null,
+            safety_notes: item.safety_notes || product?.safety_notes || null,
+            base_price: product?.unit_price || 0
+          };
+        });
+        totalCost = ruleResult.total_estimated_cost;
+        totalQty = ruleResult.monthly_total_quantity;
+        alertsArr = ruleResult.alerts || [];
+        summaryText = ruleResult.summary;
+      } else {
+        console.log('  Rule engine also failed — no recommendations possible.');
+        return res.status(503).json({success:false,error:'AI Engine is unavailable. Please ensure a valid OpenAI or Gemini API key is configured. Only AI-generated recommendations are supported.',details:'Recommendations can only be generated from OpenAI or Gemini. Default/rule-based recommendations have been disabled.',timestamp:new Date().toISOString()});
+      }
     }
 
     const rec = {id:rid,institution_id:i.id,status:'Processed',total_estimated_cost:totalCost,monthly_total_quantity:totalQty,summary:summaryText,alerts:JSON.stringify(alertsArr),source,owner:'system',processed_at:new Date().toISOString(),created_at:new Date().toISOString(),updated_at:new Date().toISOString()};
