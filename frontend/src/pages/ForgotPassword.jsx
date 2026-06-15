@@ -21,7 +21,7 @@ export default function ForgotPassword() {
         setError(res.error || 'Something went wrong');
       }
     } catch (err) {
-      setError(err.message || 'Failed to send reset email');
+      setError(err.message || 'Could not send reset email. Please try again later.');
     } finally {
       setSubmitting(false);
     }
@@ -55,12 +55,9 @@ export default function ForgotPassword() {
                 If an account exists for <span className="text-cyan-400 font-medium">{email}</span>,
                 we&apos;ve sent a password reset link. It expires in 1 hour.
               </p>
-              <Link to="/login" className="inline-flex items-center gap-1.5 text-sm text-cyan-400 hover:text-cyan-300 transition-colors font-medium">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-                Back to Login
-              </Link>
+              <p className="text-xs text-surface-500 mt-4">
+                Didn&apos;t receive it? Check your spam folder or try again.
+              </p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -76,14 +73,26 @@ export default function ForgotPassword() {
                 />
               </div>
               {error && (
-                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{error}</div>
+                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                  {error}
+                </div>
               )}
               <button
                 type="submit"
                 disabled={submitting}
                 className="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-emerald-600 text-white font-semibold hover:from-cyan-500 hover:to-emerald-500 transition-all duration-200 shadow-lg shadow-cyan-500/20 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
               >
-                {submitting ? 'Sending...' : 'Send Reset Link'}
+                {submitting ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Sending...
+                  </span>
+                ) : (
+                  'Send Reset Link'
+                )}
               </button>
             </form>
           )}

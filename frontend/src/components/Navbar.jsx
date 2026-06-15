@@ -7,6 +7,8 @@ const navTabs = [
   { path: '/dashboard', label: 'B2B Dashboard', icon: '📊' },
 ];
 
+const AUTH_PAGES = ['/login', '/forgot-password', '/reset-password', '/verify-email'];
+
 export default function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -28,7 +30,7 @@ export default function Navbar() {
   }, []);
 
   const isActive = (path) => location.pathname.startsWith(path);
-  const isLoginPage = location.pathname === '/login';
+  const isAuthPage = AUTH_PAGES.includes(location.pathname);
   const closeMobile = () => setMobileOpen(false);
 
   const handleLogout = async () => {
@@ -60,8 +62,8 @@ export default function Navbar() {
             </div>
           </Link>
 
-          {/* Desktop Navigation Tabs - hidden on login page */}
-          {!isLoginPage && (
+          {/* Desktop Navigation Tabs - hidden on auth pages */}
+          {!isAuthPage && (
             <div className="hidden md:flex items-center bg-surface-800/80 rounded-xl p-1 border border-surface-700/50">
               {navTabs.map(tab => (
                 <Link
@@ -80,8 +82,8 @@ export default function Navbar() {
             </div>
           )}
 
-          {/* Desktop right side: Home + Auth - hidden on login page */}
-          {!isLoginPage && (
+          {/* Desktop right side: Home + Auth - hidden on auth pages */}
+          {!isAuthPage && (
           <div className="hidden md:flex items-center gap-2">
             <Link
               to="/"
@@ -106,7 +108,6 @@ export default function Navbar() {
                     onClick={() => setProfileOpen(!profileOpen)}
                     className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-surface-700/50 transition-all duration-200 group"
                   >
-                    {/* Avatar */}
                     {user?.photoURL ? (
                       <img
                         src={user.photoURL}
@@ -193,8 +194,8 @@ export default function Navbar() {
           </div>
           )}
 
-          {/* Mobile hamburger - hidden on login page */}
-          {!isLoginPage && (
+          {/* Mobile hamburger - hidden on auth pages */}
+          {!isAuthPage && (
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
             className="md:hidden p-2 rounded-lg text-surface-400 hover:text-surface-200 hover:bg-surface-700/50 transition-all"
@@ -211,15 +212,14 @@ export default function Navbar() {
           )}
         </div>
 
-        {/* Mobile Drawer - hidden on login page */}
-        {!isLoginPage && (
+        {/* Mobile Drawer - hidden on auth pages */}
+        {!isAuthPage && (
         <div
           className={`md:hidden overflow-hidden transition-all duration-300 ease-in-out ${
             mobileOpen ? 'max-h-96 opacity-100 pb-4' : 'max-h-0 opacity-0'
           }`}
         >
           <div className="flex flex-col space-y-1 bg-surface-800/80 rounded-xl p-2 border border-surface-700/50">
-            {/* Mobile user info */}
             {isAuthenticated && (
               <div className="flex items-center gap-3 px-4 py-3 border-b border-surface-700/30 mb-1">
                 {user?.photoURL ? (
@@ -266,7 +266,6 @@ export default function Navbar() {
               Home
             </Link>
 
-            {/* Mobile auth actions */}
             <div className="border-t border-surface-700/30 pt-2 mt-1">
               {isAuthenticated ? (
                 <button
