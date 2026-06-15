@@ -38,6 +38,9 @@ jobs:
         env:
           VITE_API_URL: https://ai-institutional-cleaning-product-s.vercel.app/api
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+          VITE_EMAILJS_PUBLIC_KEY: ${{ secrets.VITE_EMAILJS_PUBLIC_KEY }}
+          VITE_EMAILJS_SERVICE_ID: ${{ secrets.VITE_EMAILJS_SERVICE_ID }}
+          VITE_EMAILJS_CONFIRMATION_TEMPLATE_ID: ${{ secrets.VITE_EMAILJS_CONFIRMATION_TEMPLATE_ID }}
 
       - name: Add SPA fallback for GitHub Pages
         run: cp frontend/dist/index.html frontend/dist/404.html
