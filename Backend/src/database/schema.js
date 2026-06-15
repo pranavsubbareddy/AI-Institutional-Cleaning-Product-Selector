@@ -21,16 +21,17 @@ async function initializeSchema() {
       waitForConnections: true,
       connectionLimit: 10,
       queueLimit: 0,
-      dateStrings: true
+      dateStrings: true,
+      connectTimeout: 10000
     });
     console.log(' Connected to MySQL via DATABASE_URL');
-  } else {
+  } else if (process.env.DB_HOST || process.env.DB_USER) {
     const host = process.env.DB_HOST || 'localhost';
     const user = process.env.DB_USER || 'root';
     const password = process.env.DB_PASSWORD || '';
     const database = process.env.DB_NAME || 'cleaning_platform';
 
-    const tempConn = await mysql.createConnection({ host, user, password });
+    const tempConn = await mysql.createConnection({ host, user, password, connectTimeout: 5000 });
     await tempConn.execute(`CREATE DATABASE IF NOT EXISTS \`${database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
     await tempConn.end();
 
@@ -39,9 +40,14 @@ async function initializeSchema() {
       waitForConnections: true,
       connectionLimit: 10,
       queueLimit: 0,
-      dateStrings: true
+      dateStrings: true,
+      connectTimeout: 10000
     });
     console.log(' Connected to MySQL database:', database);
+  } else {
+    // No database configured — run in memory-only mode (auth is in-memory, data resets on restart)
+    console.log(' No database configured. Running in memory-only mode. Set DATABASE_URL for persistent storage.');
+    return null;
   }
 
   // NOTE: MySQL 9.7 does not allow DEFAULT values on TEXT/BLOB/JSON columns.

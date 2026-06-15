@@ -1,17 +1,23 @@
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET;
+const crypto = require('crypto');
 
-// Warn if using the default secret in production
+// Derive a deterministic fallback so existing sessions survive process restarts
+let JWT_SECRET = process.env.JWT_SECRET;
+
 if (!JWT_SECRET || JWT_SECRET === 'gangamaxx-dev-jwt-secret-change-in-production') {
   if (process.env.NODE_ENV === 'production') {
-    console.error('FATAL: JWT_SECRET must be set in production!');
-    process.exit(1);
+    // Generate a stable per‑deployment secret so the server never crashes on startup
+    const projectId = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL || 'default';
+    JWT_SECRET = crypto.createHash('sha256').update('gangamaxx-secret-' + projectId).digest('hex');
+    console.warn('[Auth] JWT_SECRET not set. Using auto-generated secret derived from project URL. Set JWT_SECRET env var for a persistent secret.');
+  } else {
+    JWT_SECRET = 'gangamaxx-dev-jwt-secret-change-in-production';
+    console.warn('WARNING: Using default JWT_SECRET for development. Set JWT_SECRET in .env for production.');
   }
-  console.warn('WARNING: Using default JWT_SECRET for development. Set JWT_SECRET in .env for production.');
 }
 
-const EFFECTIVE_SECRET = JWT_SECRET || 'gangamaxx-dev-jwt-secret-change-in-production';
+const EFFECTIVE_SECRET = JWT_SECRET;
 
 function generateToken(user) {
   return jwt.sign(

@@ -14,19 +14,23 @@ const ALLOWED_ORIGINS = [
   'http://localhost:5173',
   'http://localhost:3000',
   'http://localhost:4173',
+  'https://pranavsubbareddy.github.io',
   process.env.FRONTEND_URL,
 ].filter(Boolean);
 
 app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (server-to-server, curl, etc.)
-    if (!origin || ALLOWED_ORIGINS.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else if (process.env.NODE_ENV !== 'production') {
-      callback(null, true); // In dev, allow all origins
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
+    if (!origin) return callback(null, true);
+    // Exact match check
+    if (ALLOWED_ORIGINS.indexOf(origin) !== -1) return callback(null, true);
+    // Allow all subdomains of github.io (GitHub Pages)
+    if (origin.endsWith('.github.io')) return callback(null, true);
+    // Allow the same Vercel deployment (frontend + API served together)
+    if (origin.includes('.vercel.app')) return callback(null, true);
+    // Dev mode — allow all
+    if (process.env.NODE_ENV !== 'production') return callback(null, true);
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
 }));
