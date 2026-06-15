@@ -89,7 +89,7 @@ export default function Login() {
     try {
       const clientId = googleClientId;
       if (!window.google?.accounts || !clientId) {
-        setError('Google Sign-In is not configured. Please set GOOGLE_CLIENT_ID in Vercel environment variables.');
+        setError('Google Sign-In is not configured. To enable it, add GOOGLE_CLIENT_ID in Vercel env vars. Get credentials at https://console.cloud.google.com/apis/credentials');
         setGoogleSubmitting(false);
         return;
       }
