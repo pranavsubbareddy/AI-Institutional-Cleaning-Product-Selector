@@ -26,6 +26,19 @@ function generateRandomToken() {
   return crypto.randomBytes(32).toString('hex');
 }
 
+// ── GET /google-config ───────────────────────────────────────────────────────────
+// Returns the Google OAuth client ID so the frontend doesn't need VITE_ prefixed env vars.
+router.get('/google-config', (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      clientId: process.env.GOOGLE_CLIENT_ID || '',
+      configured: !!process.env.GOOGLE_CLIENT_ID,
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
 // ── POST /signup ────────────────────────────────────────────────────────────────
 router.post('/signup', async (req, res, next) => {
   try {

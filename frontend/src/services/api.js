@@ -97,6 +97,7 @@ export const api = {
   resetPassword: (token, email, newPassword) => fetchApi('/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, email, newPassword }) }),
   updateProfile: (data) => fetchApi('/auth/profile', { method: 'PUT', body: JSON.stringify(data) }),
   googleSignIn: (idToken) => fetchApi('/auth/google', { method: 'POST', body: JSON.stringify({ idToken }) }),
+  googleConfig: () => fetchApi('/auth/google-config'),
 
   // Dashboard
   getDashboardStats: () => fetchApi('/dashboard/stats'),

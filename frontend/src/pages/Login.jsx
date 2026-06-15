@@ -52,14 +52,44 @@ export default function Login() {
     }
   };
 
+  const [googleClientId, setGoogleClientId] = useState('');
+
+  // Fetch Google Client ID from backend on mount
+  useEffect(() => {
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    if (clientId) {
+      setGoogleClientId(clientId);
+      return;
+    }
+    // Fallback: fetch from backend
+    api.googleConfig()
+      .then(res => {
+        if (res.success && res.data?.clientId) {
+          setGoogleClientId(res.data.clientId);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Load Google Identity Services script when client ID is available
+  useEffect(() => {
+    if (googleClientId && !document.querySelector('script[src*="accounts.google.com/gsi/client"]')) {
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      document.body.appendChild(script);
+    }
+  }, [googleClientId]);
+
   const handleGoogleSignIn = async () => {
     setGoogleSubmitting(true);
     setError('');
 
     try {
-      const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+      const clientId = googleClientId;
       if (!window.google?.accounts || !clientId) {
-        setError('Google Sign-In is not configured. Please set VITE_GOOGLE_CLIENT_ID or use email.');
+        setError('Google Sign-In is not configured. Please set GOOGLE_CLIENT_ID in Vercel environment variables.');
         setGoogleSubmitting(false);
         return;
       }
@@ -114,17 +144,7 @@ export default function Login() {
     }
   };
 
-  // Load Google Identity Services script on mount
-  useEffect(() => {
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    if (clientId && !document.querySelector('script[src*="accounts.google.com/gsi/client"]')) {
-      const script = document.createElement('script');
-      script.src = 'https://accounts.google.com/gsi/client';
-      script.async = true;
-      script.defer = true;
-      document.body.appendChild(script);
-    }
-  }, []);
+
 
   return (
     <div className="min-h-[80vh] flex items-center justify-center py-12 px-4">
