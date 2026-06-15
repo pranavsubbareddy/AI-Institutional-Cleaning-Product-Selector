@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../services/api';
 
 export default function Login() {
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, googleSignIn } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const googleBtnRef = useRef(null);
 
   // preserve redirect-to if coming from ProtectedRoute
   const from = location.state?.from || '/dashboard';
@@ -19,6 +21,7 @@ export default function Login() {
   const [gender, setGender] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [googleSubmitting, setGoogleSubmitting] = useState(false);
 
   const switchMode = () => {
     setMode(mode === 'login' ? 'signup' : 'login');
@@ -48,6 +51,80 @@ export default function Login() {
       setSubmitting(false);
     }
   };
+
+  const handleGoogleSignIn = async () => {
+    setGoogleSubmitting(true);
+    setError('');
+
+    try {
+      const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+      if (!window.google?.accounts || !clientId) {
+        setError('Google Sign-In is not configured. Please set VITE_GOOGLE_CLIENT_ID or use email.');
+        setGoogleSubmitting(false);
+        return;
+      }
+
+      // Use Google One Tap to get a credential (ID token)
+      const credential = await new Promise((resolve, reject) => {
+        // Initialize the token client to request an ID token
+        window.google.accounts.id.initialize({
+          client_id: clientId,
+          callback: (response) => {
+            if (response.credential) {
+              resolve(response.credential);
+            } else {
+              reject(new Error('Google Sign-In failed: No credential received'));
+            }
+          },
+          cancel_on_tap_outside: false,
+        });
+
+        // Prompt the One Tap UI
+        window.google.accounts.id.prompt((notification) => {
+          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+            // One Tap not shown — fall back to the popup flow
+            // Use the overridable Google Sign-In button approach
+            const client = window.google.accounts.oauth2.initCodeClient({
+              client_id: clientId,
+              scope: 'email profile openid',
+              ux_mode: 'popup',
+              callback: (codeResponse) => {
+                if (codeResponse.code) {
+                  // Send auth code to backend — the backend will exchange it
+                  resolve(codeResponse.code);
+                } else {
+                  reject(new Error('Google Sign-In was cancelled'));
+                }
+              },
+            });
+            client.requestCode();
+          }
+        });
+      });
+
+      // Send credential/auth code to backend
+      await googleSignIn(credential);
+      navigate(from, { replace: true });
+    } catch (err) {
+      if (!err.message?.includes('cancelled') && !err.message?.includes('popup')) {
+        setError(err.message || 'Google Sign-In failed');
+      }
+    } finally {
+      setGoogleSubmitting(false);
+    }
+  };
+
+  // Load Google Identity Services script on mount
+  useEffect(() => {
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    if (clientId && !document.querySelector('script[src*="accounts.google.com/gsi/client"]')) {
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      document.body.appendChild(script);
+    }
+  }, []);
 
   return (
     <div className="min-h-[80vh] flex items-center justify-center py-12 px-4">
@@ -151,6 +228,15 @@ export default function Login() {
               />
             </div>
 
+            {/* Forgot Password - login mode only */}
+            {mode === 'login' && (
+              <div className="flex justify-end">
+                <Link to="/forgot-password" className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors font-medium">
+                  Forgot password?
+                </Link>
+              </div>
+            )}
+
             {error && (
               <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
                 {error}
@@ -163,12 +249,44 @@ export default function Login() {
               className="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-emerald-600 text-white font-semibold hover:from-cyan-500 hover:to-emerald-500 transition-all duration-200 shadow-lg shadow-cyan-500/20 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
             >
               {submitting
-                ? 'Please wait\u2026'
+                ? 'Please wait…'
                 : mode === 'login'
                   ? 'Sign In'
                   : 'Create Account'}
             </button>
           </form>
+
+          {/* Divider */}
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-surface-700/50" />
+            </div>
+            <div className="relative flex justify-center text-xs">
+              <span className="bg-surface-800 px-3 text-surface-400">or continue with</span>
+            </div>
+          </div>
+
+          {/* Google Sign-In Button */}
+          <button
+            onClick={handleGoogleSignIn}
+            disabled={googleSubmitting}
+            className="w-full py-2.5 rounded-xl border border-surface-600/50 text-surface-200 font-medium hover:bg-surface-700/50 hover:border-surface-500/50 transition-all text-sm flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {googleSubmitting ? (
+              <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+              </svg>
+            )}
+            {googleSubmitting ? 'Signing in...' : 'Sign in with Google'}
+          </button>
         </div>
 
         {/* Footer link */}
@@ -183,7 +301,7 @@ export default function Login() {
         {/* Skip link */}
         <p className="text-center mt-4">
           <Link to="/" className="text-xs text-surface-500 hover:text-surface-400 transition-colors">
-            Back to Home \u2192
+            Back to Home →
           </Link>
         </p>
       </div>

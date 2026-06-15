@@ -257,6 +257,11 @@ async function initializeSchema() {
     gender VARCHAR(20) DEFAULT '',
     photoURL VARCHAR(500),
     provider VARCHAR(50) DEFAULT 'password',
+    emailVerified TINYINT(1) DEFAULT 0,
+    emailVerificationToken VARCHAR(255),
+    emailVerificationExpires DATETIME,
+    resetPasswordToken VARCHAR(255),
+    resetPasswordExpires DATETIME,
     createdAt VARCHAR(50) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -266,6 +271,21 @@ async function initializeSchema() {
     await pool.execute('ALTER TABLE users MODIFY COLUMN uid VARCHAR(50)');
   } catch (e) {
     // Ignore - column already wide enough
+  }
+  // Add new auth columns safely (ignore if already exist)
+  const newColumns = [
+    'emailVerified TINYINT(1) DEFAULT 0',
+    'emailVerificationToken VARCHAR(255)',
+    'emailVerificationExpires DATETIME',
+    'resetPasswordToken VARCHAR(255)',
+    'resetPasswordExpires DATETIME'
+  ];
+  for (const col of newColumns) {
+    try {
+      await pool.execute(`ALTER TABLE users ADD COLUMN ${col}`);
+    } catch (e) {
+      // Column already exists - ignore
+    }
   }
 
   // Add user_id column for existing databases (safe if already exists)

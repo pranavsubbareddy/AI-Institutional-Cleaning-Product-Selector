@@ -90,6 +90,13 @@ export const api = {
   logout: () => fetchApi('/auth/logout', { method: 'POST' }),
   getMe: () => fetchApi('/auth/me'),
   deleteAccount: () => fetchApi('/auth/account', { method: 'DELETE' }),
+  resendVerification: () => fetchApi('/auth/resend-verification', { method: 'POST' }),
+  verifyEmail: (token, email) => fetchApi('/auth/verify-email', { method: 'POST', body: JSON.stringify({ token, email }) }),
+  forgotPassword: (email) => fetchApi('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
+  validateResetToken: (token) => fetchApi(`/auth/validate-reset-token?token=${encodeURIComponent(token)}`),
+  resetPassword: (token, email, newPassword) => fetchApi('/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, email, newPassword }) }),
+  updateProfile: (data) => fetchApi('/auth/profile', { method: 'PUT', body: JSON.stringify(data) }),
+  googleSignIn: (idToken) => fetchApi('/auth/google', { method: 'POST', body: JSON.stringify({ idToken }) }),
 
   // Dashboard
   getDashboardStats: () => fetchApi('/dashboard/stats'),

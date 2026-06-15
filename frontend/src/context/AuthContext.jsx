@@ -44,6 +44,15 @@ export function AuthProvider({ children }) {
     throw new Error(res.error || 'Invalid email or password');
   }, []);
 
+  const googleSignIn = useCallback(async (idToken) => {
+    const res = await api.googleSignIn(idToken);
+    if (res.success && res.data) {
+      setUser(res.data);
+      return res.data;
+    }
+    throw new Error(res.error || 'Google Sign-In failed');
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await api.logout();
@@ -53,19 +62,38 @@ export function AuthProvider({ children }) {
     setUser(null);
   }, []);
 
-  const updateProfile = useCallback((updates) => {
+  const updateProfile = useCallback(async (updates) => {
+    // If there's a backend, send the update
+    try {
+      const res = await api.updateProfile(updates);
+      if (res.success && res.data) {
+        setUser(res.data);
+        return res.data;
+      }
+    } catch {
+      // Fallback to local update if backend is unavailable
+    }
+    // Local fallback
     if (!user) return;
     const updated = { ...user, ...updates };
     setUser(updated);
+    return updated;
   }, [user]);
+
+  const resendVerification = useCallback(async () => {
+    const res = await api.resendVerification();
+    return res;
+  }, []);
 
   const value = {
     user,
     loading,
     signUp,
     signIn,
+    googleSignIn,
     logout,
     updateProfile,
+    resendVerification,
     isAuthenticated: !!user,
   };
 

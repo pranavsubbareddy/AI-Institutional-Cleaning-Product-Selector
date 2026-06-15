@@ -14,24 +14,46 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
 
+  // Email verification
+  const { resendVerification } = useAuth();
+  const [verifying, setVerifying] = useState(false);
+
   // Delete account state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
 
+  const handleResendVerification = async () => {
+    setVerifying(true);
+    setMessage('');
+    try {
+      const res = await resendVerification();
+      setMessage(res.message || 'Verification email sent!');
+    } catch (err) {
+      setMessage('Failed: ' + (err.message || 'Unknown error'));
+    } finally {
+      setVerifying(false);
+      setTimeout(() => setMessage(''), 5000);
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     setMessage('');
-    await new Promise(r => setTimeout(r, 300));
-    updateProfile({ phoneNumber: phone.trim(), age: age ? Number(age) : null, gender });
-    setMessage('Profile updated successfully!');
-    setSaving(false);
-    setEditing(false);
-    setTimeout(() => setMessage(''), 3000);
+    try {
+      await updateProfile({ phone: phone.trim(), age: age ? Number(age) : null, gender });
+      setMessage('Profile updated successfully!');
+      setEditing(false);
+    } catch (err) {
+      setMessage('Failed to update: ' + (err.message || 'Unknown error'));
+    } finally {
+      setSaving(false);
+      setTimeout(() => setMessage(''), 3000);
+    }
   };
 
   const handleCancel = () => {
-    setPhone(user?.phoneNumber || '');
+    setPhone(user?.phone || '');
     setAge(user?.age ? String(user.age) : '');
     setGender(user?.gender || '');
     setEditing(false);
@@ -82,10 +104,19 @@ export default function ProfilePage() {
           </div>
           <div>
             <h2 className="text-lg font-semibold text-surface-100">{user.displayName || 'User'}</h2>
-            <p className="text-sm text-surface-400">{user.email}</p>
-            <span className="inline-block mt-1.5 text-[11px] px-2.5 py-0.5 rounded-full bg-surface-700 text-surface-400 border border-surface-600">
-              {user.provider === 'google.com' ? 'Google Account' : 'Email Account'}
-            </span>
+            <p className="text-sm text-surface-400">{user.email}</p>              <span className="inline-block mt-1.5 text-[11px] px-2.5 py-0.5 rounded-full bg-surface-700 text-surface-400 border border-surface-600">
+                {user.provider === 'google' ? 'Google Account' : 'Email Account'}
+              </span>
+              {/* Email Verification Badge */}
+              {user.provider !== 'google' && (
+                <span className={`inline-block mt-1.5 ml-2 text-[11px] px-2.5 py-0.5 rounded-full border ${
+                  user.emailVerified
+                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                    : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                }`}>
+                  {user.emailVerified ? '✓ Verified' : '○ Unverified'}
+                </span>
+              )}
           </div>
         </div>
       </div>
@@ -128,7 +159,7 @@ export default function ProfilePage() {
             {editing ? (
               <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91-9876543210" className="w-full px-4 py-2.5 rounded-xl bg-surface-800 border border-surface-600/50 text-surface-100 placeholder-surface-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500/50 transition-all text-sm" />
             ) : (
-              <div className="px-4 py-2.5 rounded-xl bg-surface-800/50 border border-surface-700/50 text-surface-200 text-sm">{user.phoneNumber || 'N/A'}</div>
+              <div className="px-4 py-2.5 rounded-xl bg-surface-800/50 border border-surface-700/50 text-surface-200 text-sm">{user.phone || 'N/A'}</div>
             )}
           </div>
           <div>
@@ -171,6 +202,35 @@ export default function ProfilePage() {
               )}
             </button>
             <button onClick={handleCancel} disabled={saving} className="px-6 py-2.5 rounded-xl border border-surface-600 text-surface-300 hover:bg-surface-700/50 hover:text-surface-100 transition-all text-sm font-medium disabled:opacity-50">Cancel</button>
+          </div>
+        )}
+
+        {/* Email Verification */}
+        {user.provider !== 'google' && !user.emailVerified && (
+          <div className="mt-6 pt-6 border-t border-surface-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-amber-400">Email not verified</p>
+                <p className="text-xs text-surface-400 mt-0.5">Verify your email to enable login notifications</p>
+              </div>
+              <button
+                onClick={handleResendVerification}
+                disabled={verifying}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/20 text-sm font-medium transition-all disabled:opacity-50"
+              >
+                {verifying ? (
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                )}
+                {verifying ? 'Sending...' : 'Resend Verification'}
+              </button>
+            </div>
           </div>
         )}
       </div>
