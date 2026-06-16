@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { INSTITUTION_TYPES } from '../services/api';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const CUSTOM_OPTION = { value: 'custom', label: 'Custom (type your own)', icon: '\u270f\ufe0f' };
+const CUSTOM_OPTION = { value: 'custom', label: 'Custom (type your own)' };
 const ALL_OPTIONS = [...INSTITUTION_TYPES.filter(t => t.value !== 'custom'), CUSTOM_OPTION];
 
 export default function InstitutionTypeDropdown({ value, onChange, error, required = false }) {
@@ -33,21 +33,17 @@ export default function InstitutionTypeDropdown({ value, onChange, error, requir
   const filteredOptions = useMemo(() => {
     if (!search.trim()) return ALL_OPTIONS;
     const q = search.toLowerCase();
-    return ALL_OPTIONS.filter(opt => opt.label.toLowerCase().includes(q) || opt.icon.includes(q));
+    return ALL_OPTIONS.filter(opt => opt.label.toLowerCase().includes(q));
   }, [search]);
 
   const displayLabel = useMemo(() => {
     if (!value) return 'Select institution type...';
     const preset = INSTITUTION_TYPES.find(t => t.value === value);
-    if (preset) return preset.icon + ' ' + preset.label;
+    if (preset) return preset.label;
     return 'Custom: ' + value;
   }, [value]);
 
-  const displayIcon = useMemo(() => {
-    if (!value) return null;
-    const preset = INSTITUTION_TYPES.find(t => t.value === value);
-    return preset?.icon || '\u270f\ufe0f';
-  }, [value]);
+
 
   const isSelected = (optValue) => {
     if (optValue === 'custom') return isCustom;
@@ -149,14 +145,7 @@ export default function InstitutionTypeDropdown({ value, onChange, error, requir
         aria-expanded={isOpen}
         aria-haspopup="listbox"
       >
-        <span className="text-xl flex-shrink-0 w-8 h-8 rounded-lg bg-surface-700 flex items-center justify-center">
-          {displayIcon || (
-            <svg className="w-4 h-4 text-surface-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
-          )}
-        </span>
-        <span className={`flex-1 text-sm truncate ${value ? 'text-surface-200' : 'text-surface-400'}`}>
+        <span className="flex-1 text-sm truncate ${value ? 'text-surface-200' : 'text-surface-400'}">
           {displayLabel}
         </span>
         {required && !value && (
@@ -229,9 +218,6 @@ export default function InstitutionTypeDropdown({ value, onChange, error, requir
                         onClick={() => handleSelect(opt.value)} onMouseEnter={() => setActiveIndex(idx)}
                         className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all duration-150 ${active ? 'bg-cyan-500/10 text-surface-200' : selected ? 'bg-cyan-500/5 text-surface-200' : 'text-surface-300 hover:bg-surface-700/50 hover:text-surface-200'}`}
                       >
-                        <span className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0 ${selected ? 'bg-cyan-500/20 ring-1 ring-cyan-500/30' : active ? 'bg-surface-700 ring-1 ring-surface-500' : 'bg-surface-700'}`}>
-                          {opt.icon}
-                        </span>
                         <span className="flex-1 text-sm font-medium">{highlightText(opt.label, search)}</span>
                         {selected && (
                           <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} className="w-6 h-6 rounded-full bg-cyan-500 flex items-center justify-center flex-shrink-0">
@@ -259,9 +245,6 @@ export default function InstitutionTypeDropdown({ value, onChange, error, requir
                     onClick={() => handleSelect('custom')}
                     className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all duration-150 ${isCustom ? 'bg-cyan-500/5 text-surface-200' : 'text-surface-300 hover:bg-surface-700/50 hover:text-surface-200'}`}
                   >
-                    <span className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0 ${isCustom ? 'bg-cyan-500/20 ring-1 ring-cyan-500/30' : 'bg-surface-700'}`}>
-                      {'\u270f\ufe0f'}
-                    </span>
                     <span className="flex-1 text-sm font-medium">Custom (type your own)</span>
                     {isCustom && (
                       <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} className="w-6 h-6 rounded-full bg-cyan-500 flex items-center justify-center flex-shrink-0">

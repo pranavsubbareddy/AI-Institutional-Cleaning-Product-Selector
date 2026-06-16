@@ -536,7 +536,6 @@ export default function Home() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
           {featuredTypes.map((type) => (
             <Link key={type.value} to="/form" className="card p-4 sm:p-6 text-center hover:border-cyan-500/30 transition-all duration-300 group">
-              <span className="text-2xl sm:text-3xl block mb-2 group-hover:scale-125 transition-transform inline-block">{type.icon}</span>
               <p className="text-xs sm:text-sm font-medium text-surface-200 group-hover:text-cyan-400 transition-colors">{type.label}</p>
             </Link>
           ))}
