@@ -3,8 +3,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const navTabs = [
-  { path: '/form', label: 'Requirement Form', icon: '📋' },
-  { path: '/dashboard', label: 'B2B Dashboard', icon: '📊' },
+  { path: '/form', label: 'Requirement Form' },
+  { path: '/dashboard', label: 'B2B Dashboard' },
 ];
 
 const AUTH_PAGES = ['/login', '/forgot-password', '/reset-password', '/verify-email'];
@@ -75,8 +75,7 @@ export default function Navbar() {
                       : 'text-surface-400 hover:text-surface-200 hover:bg-surface-700/50'
                   }`}
                 >
-                  <span className="mr-2 text-base">{tab.icon}</span>
-                  <span className="hidden sm:inline">{tab.label}</span>
+                  <span>{tab.label}</span>
                 </Link>
               ))}
             </div>
@@ -247,7 +246,6 @@ export default function Navbar() {
                     : 'text-surface-400 hover:text-surface-200 hover:bg-surface-700/50'
                 }`}
               >
-                <span className="mr-3 text-lg">{tab.icon}</span>
                 {tab.label}
               </Link>
             ))}
