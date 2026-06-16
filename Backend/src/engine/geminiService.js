@@ -17,7 +17,7 @@ const RecommendationSchema = z.object({
         safety_notes: z.string().describe('Safety precautions'),
       })
     )
-    .describe('Array of recommended products — all that are relevant'),
+    .describe('Array of recommended products — recommend 4-8 most relevant products'),
   summary: z.object({
     grossAggregatedCost: z.number().describe('Total monthly cost of all recommended products in INR'),
     financialStatusAlert: z.string().nullable().describe('Budget/financial alert message or null'),
@@ -95,8 +95,10 @@ function getStructuredModel(key, provider) {
     const chatModel = new ChatOpenAI({
       apiKey: key,
       model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-      temperature: 0.7,
-      maxTokens: 4096,
+      temperature: 0.3,
+      maxTokens: 1536,
+      timeout: 7000,
+      maxRetries: 0,
     });
     model = chatModel.withStructuredOutput(RecommendationSchema, {
       name: 'recommendation',
@@ -106,8 +108,9 @@ function getStructuredModel(key, provider) {
     const chatModel = new ChatGoogleGenerativeAI({
       apiKey: key,
       model: geminiModel,
-      temperature: 0.3,
-      maxOutputTokens: 8192,
+      temperature: 0.2,
+      maxOutputTokens: 2048,
+      timeout: 7000,
     });
     model = chatModel.withStructuredOutput(RecommendationSchema, {
       name: 'recommendation',
@@ -145,7 +148,10 @@ async function generateRecommendations(params) {
       try {
         console.log(`  Trying OpenAI API key ${index + 1}/${apiKeys.length}...`);
         const structuredModel = getStructuredModel(apiKeys[index], 'openai');
-        const result = await structuredModel.invoke(prompt);
+        const result = await Promise.race([
+          structuredModel.invoke(prompt),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 9000))
+        ]);
 
         if (result && result.recommendations && result.recommendations.length > 0 && result.summary) {
           console.log('  OpenAI success —', result.recommendations.length, 'products recommended');
@@ -154,11 +160,15 @@ async function generateRecommendations(params) {
 
         console.warn('  OpenAI returned invalid/malformed response.');
       } catch (error) {
-        const status = error.status || error.code || 'unknown';
-        if (status === 429) {
-          console.warn(`  ⛔ RATE LIMIT on OpenAI key ${index + 1}/${apiKeys.length}. Rotating to next key...`);
+        if (error.message === 'TIMEOUT') {
+          console.warn(`  ⛔ TIMEOUT on OpenAI key ${index + 1}/${apiKeys.length}. Moving to next key...`);
         } else {
-          console.warn(`  OpenAI key ${index + 1}/${apiKeys.length} failed (${status}):`, error.message);
+          const status = error.status || error.code || 'unknown';
+          if (status === 429) {
+            console.warn(`  ⛔ RATE LIMIT on OpenAI key ${index + 1}/${apiKeys.length}. Rotating to next key...`);
+          } else {
+            console.warn(`  OpenAI key ${index + 1}/${apiKeys.length} failed (${status}):`, error.message);
+          }
         }
       }
     }
@@ -173,7 +183,10 @@ async function generateRecommendations(params) {
       try {
         console.log(`  Trying Gemini API key ${index + 1}/${geminiKeys.length}...`);
         const structuredModel = getStructuredModel(geminiKeys[index], 'gemini');
-        const result = await structuredModel.invoke(prompt);
+        const result = await Promise.race([
+          structuredModel.invoke(prompt),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 9000))
+        ]);
 
         if (result && result.recommendations && result.recommendations.length > 0 && result.summary) {
           console.log('  Gemini success —', result.recommendations.length, 'products recommended');
@@ -182,11 +195,15 @@ async function generateRecommendations(params) {
 
         console.warn('  Gemini returned invalid/malformed response.');
       } catch (error) {
-        const status = error.status || error.code || 'unknown';
-        if (status === 429) {
-          console.warn(`  ⛔ RATE LIMIT on Gemini key ${index + 1}/${geminiKeys.length}. Rotating to next key...`);
+        if (error.message === 'TIMEOUT') {
+          console.warn(`  ⛔ TIMEOUT on Gemini key ${index + 1}/${geminiKeys.length}. Moving to next key...`);
         } else {
-          console.warn(`  Gemini key ${index + 1}/${geminiKeys.length} failed (${status}):`, error.message);
+          const status = error.status || error.code || 'unknown';
+          if (status === 429) {
+            console.warn(`  ⛔ RATE LIMIT on Gemini key ${index + 1}/${geminiKeys.length}. Rotating to next key...`);
+          } else {
+            console.warn(`  Gemini key ${index + 1}/${geminiKeys.length} failed (${status}):`, error.message);
+          }
         }
       }
     }
@@ -306,27 +323,17 @@ function buildPrompt(params, catalog) {
   const budget = params.budget || 'Medium';
   const instType = params.institution_type || 'Facility';
 
-  return `You are a cleaning product procurement expert. Based on the request below, recommend specific cleaning products with real brand names and realistic Indian market prices.
+  return `You are a cleaning product procurement expert. Recommend 4-6 cleaning products for this Indian facility.
 
-REQUEST TYPE: ${instType}
+TYPE: ${instType}
 AREA: ${area}
 SURFACES: ${surfaces}
-HYGIENE LEVEL: ${hygiene}
-BUDGET LEVEL: ${budget}
+HYGIENE: ${hygiene}
+BUDGET: ${budget}
 
-For each product provide:
-- productId: unique ID (e.g., REC-001)
-- sku: realistic SKU
-- name: specific product name with brand (use real brands like Diversey, SC Johnson, 3M, Ecolab, savo, Vim, Lizol, Domex, Colin, or other professional/retail brands available in India)
-- recommended_dilution: exact water+product mix (e.g., "Mix 50ml per 1 litre water") or "Ready to use" if no dilution needed
-- estimated_monthly_qty_units: realistic monthly usage for given area/size
-- calculated_cost: monthly cost in INR
-- usage_guidance: clear step-by-step use instructions
-- safety_notes: important safety information
+For each: productId (e.g. REC-001), sku, name (use real Indian brands like Diversey, Savo, Vim, Lizol, Domex, Colin), recommended_dilution, estimated_monthly_qty_units, calculated_cost (INR), usage_guidance, safety_notes
 
-Recommend ALL relevant products — no limit. Use your knowledge of real products.
-
-Respond ONLY with valid JSON:
+Respond ONLY with valid JSON matching this schema:
 {"recommendations":[{"productId":"","sku":"","name":"","recommended_dilution":"","estimated_monthly_qty_units":0,"calculated_cost":0,"usage_guidance":"","safety_notes":""}],"summary":{"grossAggregatedCost":0,"financialStatusAlert":null}}`;
 }
 
