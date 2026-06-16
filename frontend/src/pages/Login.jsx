@@ -22,6 +22,7 @@ export default function Login() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const switchMode = () => {
     setMode(mode === 'login' ? 'signup' : 'login');
@@ -173,41 +174,48 @@ export default function Login() {
             {mode === 'signup' && (
               <>
                 <div>
-                  <label className="block text-sm font-medium text-surface-300 mb-1.5">Display Name</label>
+                  <label htmlFor="displayName" className="block text-sm font-medium text-surface-300 mb-1.5">Display Name</label>
                   <input
+                    id="displayName"
                     type="text"
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     placeholder="Your name"
+                    autoComplete="name"
                     className="w-full px-3.5 py-2.5 rounded-xl bg-surface-800 border border-surface-600/50 text-surface-100 placeholder-surface-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500/50 transition-all text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-surface-300 mb-1.5">Phone Number</label>
+                  <label htmlFor="phone" className="block text-sm font-medium text-surface-300 mb-1.5">Phone Number</label>
                   <input
+                    id="phone"
                     type="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="+91-9876543210"
+                    autoComplete="tel"
                     className="w-full px-3.5 py-2.5 rounded-xl bg-surface-800 border border-surface-600/50 text-surface-100 placeholder-surface-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500/50 transition-all text-sm"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-surface-300 mb-1.5">Age</label>
+                    <label htmlFor="age" className="block text-sm font-medium text-surface-300 mb-1.5">Age</label>
                     <input
+                      id="age"
                       type="number"
                       value={age}
                       onChange={(e) => setAge(e.target.value)}
                       placeholder="25"
                       min={10}
                       max={120}
+                      autoComplete="bday-year"
                       className="w-full px-3.5 py-2.5 rounded-xl bg-surface-800 border border-surface-600/50 text-surface-100 placeholder-surface-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500/50 transition-all text-sm"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-surface-300 mb-1.5">Gender</label>
+                    <label htmlFor="gender" className="block text-sm font-medium text-surface-300 mb-1.5">Gender</label>
                     <select
+                      id="gender"
                       value={gender}
                       onChange={(e) => setGender(e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl bg-surface-800 border border-surface-600/50 text-surface-100 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500/50 transition-all text-sm appearance-none cursor-pointer"
@@ -224,28 +232,52 @@ export default function Login() {
             )}
 
             <div>
-              <label className="block text-sm font-medium text-surface-300 mb-1.5">Email</label>
+              <label htmlFor="email" className="block text-sm font-medium text-surface-300 mb-1.5">Email</label>
               <input
+                id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
                 required
+                autoComplete="email"
                 className="w-full px-3.5 py-2.5 rounded-xl bg-surface-800 border border-surface-600/50 text-surface-100 placeholder-surface-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500/50 transition-all text-sm"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-surface-300 mb-1.5">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter password"
-                required
-                minLength={6}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-surface-800 border border-surface-600/50 text-surface-100 placeholder-surface-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500/50 transition-all text-sm"
-              />
+              <label htmlFor="password" className="block text-sm font-medium text-surface-300 mb-1.5">Password</label>
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter password"
+                  required
+                  minLength={6}
+                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                  className="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-surface-800 border border-surface-600/50 text-surface-100 placeholder-surface-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500/50 transition-all text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-surface-400 hover:text-surface-200 transition-colors p-1"
+                  tabIndex={-1}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? (
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
             </div>
 
             {/* Forgot Password - login mode only */}
