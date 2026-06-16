@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { queryAll } = require('../database/schema');
+const { queryAll, safeJsonParse } = require('../database/schema');
 const { requireAuth } = require('../middleware/auth');
 
 // All dashboard routes require authentication
@@ -135,7 +135,7 @@ router.get('/institutions', async (req, res, next) => {
 
     const parsed = institutions.map(inst => ({
       ...inst,
-      surface_types: JSON.parse(inst.surface_types || '[]')
+      surface_types: safeJsonParse(inst.surface_types, [])
     }));
 
     res.json({

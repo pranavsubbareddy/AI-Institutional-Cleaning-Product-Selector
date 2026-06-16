@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const { body, validationResult } = require('express-validator');
-const { queryAll, queryOne, run } = require('../database/schema');
+const { queryAll, queryOne, run, safeJsonParse } = require('../database/schema');
 const { generateRecommendations } = require('../engine/geminiService');
 const { MOCK_PRODUCT_CATALOG } = require('../engine/productCatalog');
 const { requireAuth } = require('../middleware/auth');
@@ -156,8 +156,8 @@ router.post('/process', validateProcessBody, async (req, res, next) => {
           timestamp: new Date().toISOString()
         });
       }
-      institution.surface_types = JSON.parse(institution.surface_types || '[]');
-      institution.metadata = institution.metadata ? JSON.parse(institution.metadata) : null;
+      institution.surface_types = safeJsonParse(institution.surface_types, []);
+      institution.metadata = safeJsonParse(institution.metadata, null);
     }
     // --- MODE 2: Direct form submission (new flow) ---
     else if (institutionType && areaSize && surfaceTypes) {
@@ -175,7 +175,7 @@ router.post('/process', validateProcessBody, async (req, res, next) => {
       );
 
       institution = await queryOne('SELECT * FROM institutions WHERE id = ?', [newId]);
-      institution.surface_types = JSON.parse(institution.surface_types || '[]');
+      institution.surface_types = safeJsonParse(institution.surface_types, []);
     }
     // --- No valid input ---
     else {
@@ -322,7 +322,7 @@ router.post('/process', validateProcessBody, async (req, res, next) => {
       data: {
         recommendation: {
           ...recommendation,
-          alerts: JSON.parse(recommendation?.alerts || '[]'),
+          alerts: safeJsonParse(recommendation?.alerts, []),
           source: 'AI_Engine',
           status: 'Processed',
           owner: 'system',
@@ -370,7 +370,7 @@ router.get('/', async (req, res, next) => {
     params.push(Number(limit), offset);
     const recommendations = await queryAll(sql, params);
 
-    const parsed = recommendations.map(r => ({ ...r, alerts: JSON.parse(r.alerts || '[]') }));
+    const parsed = recommendations.map(r => ({ ...r, alerts: safeJsonParse(r.alerts, []) }));
 
     res.json({
       success: true,
@@ -406,7 +406,7 @@ router.get('/:id', async (req, res, next) => {
     }
 
     // Parse metadata
-    recommendation.metadata = recommendation.metadata ? JSON.parse(recommendation.metadata) : null;
+    recommendation.metadata = safeJsonParse(recommendation.metadata, null);
 
     let items = await queryAll(
       `SELECT ri.*, p.name as product_name, p.category, p.safety_notes, p.usage_guidance,
@@ -433,8 +433,8 @@ router.get('/:id', async (req, res, next) => {
       success: true,
       data: {
         ...recommendation,
-        alerts: JSON.parse(recommendation.alerts || '[]'),
-        surface_types: JSON.parse(recommendation.surface_types || '[]'),
+        alerts: safeJsonParse(recommendation.alerts, []),
+        surface_types: safeJsonParse(recommendation.surface_types, []),
         items
       },
       timestamp: new Date().toISOString()

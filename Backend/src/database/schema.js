@@ -627,4 +627,19 @@ async function closePool() {
   }
 }
 
-module.exports = { getPool, initializeSchema, queryAll, queryOne, run, closePool };
+// ── Safe JSON parsing utility ────────────────────────────────────────────
+// Handles malformed or plain-string values gracefully, falling back to a default.
+function safeJsonParse(value, fallback = null) {
+  if (value === null || value === undefined || value === '') return fallback;
+  if (typeof value !== 'string') return value; // Already parsed
+  // If it's a plain word (no brackets/braces), it's not JSON — treat as fallback
+  if (!/^[\[\{]/.test(value.trim())) return fallback;
+  try {
+    return JSON.parse(value);
+  } catch {
+    console.warn('[safeJsonParse] Failed to parse:', value);
+    return fallback;
+  }
+}
+
+module.exports = { getPool, initializeSchema, queryAll, queryOne, run, closePool, safeJsonParse };

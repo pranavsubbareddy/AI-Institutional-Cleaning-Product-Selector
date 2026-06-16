@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
-const { queryAll, queryOne, run } = require('../database/schema');
+const { queryAll, queryOne, run, safeJsonParse } = require('../database/schema');
 const { validateInstitutionInput, validatePagination } = require('../middleware/validation');
 const { requireAuth } = require('../middleware/auth');
 
@@ -19,8 +19,8 @@ router.post('/', validateInstitutionInput, async (req, res) => {
     );
 
     const institution = await queryOne('SELECT * FROM institutions WHERE id = ?', [id]);
-    institution.surface_types = JSON.parse(institution.surface_types || '[]');
-    institution.metadata = institution.metadata ? JSON.parse(institution.metadata) : null;
+    institution.surface_types = safeJsonParse(institution.surface_types, []);
+    institution.metadata = safeJsonParse(institution.metadata, null);
 
     res.status(201).json({
       success: true,
@@ -63,8 +63,8 @@ router.get('/', validatePagination, async (req, res) => {
 
     const parsed = institutions.map(inst => ({
       ...inst,
-      surface_types: JSON.parse(inst.surface_types || '[]'),
-      metadata: inst.metadata ? JSON.parse(inst.metadata) : null
+      surface_types: safeJsonParse(inst.surface_types, []),
+      metadata: safeJsonParse(inst.metadata, null)
     }));
 
     res.json({
@@ -96,8 +96,8 @@ router.get('/:id', async (req, res) => {
         timestamp: new Date().toISOString()
       });
     }
-    institution.surface_types = JSON.parse(institution.surface_types || '[]');
-    institution.metadata = institution.metadata ? JSON.parse(institution.metadata) : null;
+    institution.surface_types = safeJsonParse(institution.surface_types, []);
+    institution.metadata = safeJsonParse(institution.metadata, null);
     const recommendations = await queryAll('SELECT * FROM recommendations WHERE institution_id = ? ORDER BY created_at DESC', [req.params.id]);
 
     res.json({
@@ -151,8 +151,8 @@ router.put('/:id', async (req, res) => {
     }
 
     const updated = await queryOne('SELECT * FROM institutions WHERE id = ?', [req.params.id]);
-    updated.surface_types = JSON.parse(updated.surface_types || '[]');
-    updated.metadata = updated.metadata ? JSON.parse(updated.metadata) : null;
+    updated.surface_types = safeJsonParse(updated.surface_types, []);
+    updated.metadata = safeJsonParse(updated.metadata, null);
 
     res.json({
       success: true,
