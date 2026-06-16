@@ -5,9 +5,11 @@ import { AuthProvider } from './context/AuthContext'
 import App from './App'
 import './index.css'
 
-// In production (GitHub Pages), the site is served at /AI-Institutional-Cleaning-Product-Selector/
-// In development (Vite dev server), it's served at /
-const basename = import.meta.env.PROD ? '/AI-Institutional-Cleaning-Product-Selector/' : '/';
+// Use Vite's base URL which is configured in vite.config.js per environment:
+//   - Vercel: '/'
+//   - GitHub Pages: '/AI-Institutional-Cleaning-Product-Selector/'
+//   - Dev server: '/'
+const basename = import.meta.env.BASE_URL;
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig(({ mode }) => ({
   plugins: [react()],
-  base: process.env.VITE_BASE_URL || (mode === 'production' ? '/AI-Institutional-Cleaning-Product-Selector/' : '/'),
+  base: process.env.VITE_BASE_URL || (process.env.VERCEL === '1' ? '/' : (mode === 'production' ? '/AI-Institutional-Cleaning-Product-Selector/' : '/')),
   build: {
     outDir: 'frontend/dist',
   },
