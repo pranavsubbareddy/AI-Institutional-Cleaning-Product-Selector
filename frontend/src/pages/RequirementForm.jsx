@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, INSTITUTION_TYPES, SURFACE_TYPES, HYGIENE_LEVELS, BUDGET_LEVELS } from '../services/api';
+import { api, SURFACE_TYPES, HYGIENE_LEVELS, BUDGET_LEVELS } from '../services/api';
 import InstitutionTypeDropdown from '../components/InstitutionTypeDropdown';
 import { sendFormWithReportEmail, isEmailJSConfigured } from '../services/emailService';
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { api, INSTITUTION_TYPES, SURFACE_TYPES, HYGIENE_LEVELS, BUDGET_LEVELS } from '../services/api';
+import { api, SURFACE_TYPES, HYGIENE_LEVELS, BUDGET_LEVELS } from '../services/api';
 import InstitutionTypeDropdown from '../components/InstitutionTypeDropdown';
 import LoadingState from '../components/LoadingState';
 import ErrorState from '../components/ErrorState';
