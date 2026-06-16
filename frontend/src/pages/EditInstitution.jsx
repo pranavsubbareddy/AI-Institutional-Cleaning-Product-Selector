@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api, INSTITUTION_TYPES, SURFACE_TYPES, HYGIENE_LEVELS, BUDGET_LEVELS } from '../services/api';
+import InstitutionTypeDropdown from '../components/InstitutionTypeDropdown';
 import LoadingState from '../components/LoadingState';
 import ErrorState from '../components/ErrorState';
 
@@ -243,13 +244,11 @@ export default function EditInstitution() {
           </div>
           <div>
             <label className="label">Institution Type *</label>
-            <select name="institution_type" value={formData.institution_type} onChange={handleChange}
-              className="input-field" required>
-              <option value="">Select type...</option>
-              {INSTITUTION_TYPES.map(t => (
-                <option key={t.value} value={t.value}>{t.icon} {t.label}</option>
-              ))}
-            </select>
+            <InstitutionTypeDropdown
+              value={formData.institution_type}
+              onChange={(val) => setFormData(prev => ({ ...prev, institution_type: val }))}
+              required
+            />
           </div>
           <div>
             <label className="label">Total Area Size (sq. ft.) *</label>

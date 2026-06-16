@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, INSTITUTION_TYPES, SURFACE_TYPES, HYGIENE_LEVELS, BUDGET_LEVELS } from '../services/api';
+import InstitutionTypeDropdown from '../components/InstitutionTypeDropdown';
 import { sendFormWithReportEmail, isEmailJSConfigured } from '../services/emailService';
 
 const FLOOR_OPTIONS = [
@@ -253,54 +254,11 @@ export default function RequirementForm() {
             </div>
             <div>
               <label className="label">Institution Type *</label>
-              {(() => {
-                // Track if the current type is a custom typed value (not from the predefined list)
-                const isCustomType = formData.institution_type === 'custom' || 
-                  (formData.institution_type !== '' && !INSTITUTION_TYPES.some(t => t.value === formData.institution_type));
-                const customTypeValue = isCustomType ? (formData.custom_type || formData.institution_type) : '';
-                return (
-                  <>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      {INSTITUTION_TYPES.map(type => {
-                        const isSelected = type.value === 'custom'
-                          ? isCustomType
-                          : formData.institution_type === type.value;
-                        return (
-                          <button key={type.value} type="button"
-                            onClick={() => {
-                              if (type.value === 'custom') {
-                                // Enter custom mode — keep existing custom value if any
-                                const existing = customTypeValue || '';
-                                setFormData(prev => ({ ...prev, institution_type: 'custom', custom_type: existing }));
-                              } else {
-                                setFormData(prev => ({ ...prev, institution_type: type.value, custom_type: '' }));
-                              }
-                            }}
-                            className={`p-4 rounded-xl border text-center transition-all duration-200 ${
-                              isSelected
-                                ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400 shadow-lg shadow-cyan-500/10 ring-1 ring-cyan-500/30' 
-                                : 'border-surface-600 hover:border-surface-500 bg-surface-700/50 text-surface-300 hover:text-surface-200'
-                            }`}>
-                            <span className="text-2xl block mb-1.5">{type.icon}</span>
-                            <span className="text-[11px] font-medium leading-tight block">{type.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {isCustomType && (
-                      <div className="mt-3">
-                        <input type="text"
-                          value={customTypeValue}
-                          onChange={(e) => setFormData(prev => ({ ...prev, custom_type: e.target.value, institution_type: e.target.value }))}
-                          className="input-field"
-                          placeholder="Type your own — e.g., house, car, apartment, gym"
-                          autoFocus />
-                        <p className="text-xs text-cyan-400 mt-1.5">✨ The AI can recommend products for any type of space</p>
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
+              <InstitutionTypeDropdown
+                value={formData.institution_type}
+                onChange={(val) => setFormData(prev => ({ ...prev, institution_type: val }))}
+                required
+              />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
