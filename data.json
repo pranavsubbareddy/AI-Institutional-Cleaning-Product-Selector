@@ -9820,5 +9820,24 @@
       "safety_notes": "Extremely flammable aerosol. Keep away from heat, hot surfaces, sparks, open flames, and other ignition sources. No smoking. Pressurized container: Do not pierce or burn, even after use. Protect from sunlight. Do not expose to temperatures exceeding 50°C. Keep out of reach of children and pets. Do not spray on skin, eyes, or clothing.",
       "base_price": 180
     }
+  ],
+  "USERS": [
+    {
+      "uid": "user_permanent_001",
+      "email": "pranavsubbareddy11@gmail.com",
+      "passwordHash": "$2b$10$i/zNBOxrRVZWBI/2nhAIh.S6l.3duRJNXK.ePgSpJdF8XDKQ8tOuS",
+      "displayName": "Pranav",
+      "phone": "",
+      "age": null,
+      "gender": "",
+      "photoURL": null,
+      "provider": "password",
+      "emailVerified": true,
+      "emailVerificationToken": null,
+      "emailVerificationExpires": null,
+      "resetPasswordToken": null,
+      "resetPasswordExpires": null,
+      "createdAt": "2026-06-16T05:26:14.451Z"
+    }
   ]
 }

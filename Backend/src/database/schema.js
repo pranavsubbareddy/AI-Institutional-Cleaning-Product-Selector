@@ -1,12 +1,33 @@
+const fs = require('fs');
+const path = require('path');
 const mysql = require('mysql2/promise');
 
 let pool = null;
 
 // ── In-memory SQL engine (fallback when no MySQL database is available) ──
 // Stores data in a simple object-of-arrays so auth, institutions, etc. work
-// even without DATABASE_URL. Data is ephemeral — resets on server restart.
+// even without DATABASE_URL. On cold start, users are loaded from data.json
+// (deployed with the code) so the main account never gets lost.
 // ─────────────────────────────────────────────────────────────────────────
 const memoryTables = {};
+
+// Load pre-seeded user data from data.json (if available)
+function seedUsersFromDisk() {
+  const dataFile = path.join(__dirname, '..', '..', '..', 'data.json');
+  try {
+    if (fs.existsSync(dataFile)) {
+      const raw = fs.readFileSync(dataFile, 'utf-8');
+      const data = JSON.parse(raw);
+      if (data.USERS && data.USERS.length > 0) {
+        const users = memTable('users');
+        data.USERS.forEach(u => users.push(u));
+        console.log('  Loaded ' + data.USERS.length + ' pre-seeded user(s) from data.json');
+      }
+    }
+  } catch (err) {
+    console.warn('  Could not load users from data.json:', err.message);
+  }
+}
 
 function memTable(name) {
   if (!memoryTables[name]) {
@@ -300,9 +321,11 @@ async function initializeSchema() {
     });
     console.log(' Connected to MySQL database:', database);
   } else {
-    // No database configured — run in memory-only mode (all data resets on restart)
+    // No database configured — run in memory-only mode
     console.log(' No database configured. Running in memory-only mode. Set DATABASE_URL for persistent storage.');
     // pool stays null; queryAll/queryOne/run will use the in-memory engine
+    // Load pre-seeded users from data.json so main account survives cold starts
+    seedUsersFromDisk();
     return null;
   }
 

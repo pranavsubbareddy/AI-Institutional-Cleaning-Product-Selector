@@ -3,7 +3,7 @@ const path = require('path');
 
 const DATA_FILE = path.join(__dirname, '..', 'data.json');
 
-let INST, RECS, ITEMS;
+let INST, RECS, ITEMS, USERS;
 let saveTimer = null;
 let isLoading = false;
 
@@ -12,13 +12,13 @@ function load() {
     if (fs.existsSync(DATA_FILE)) {
       const raw = fs.readFileSync(DATA_FILE, 'utf-8');
       const data = JSON.parse(raw);
-      console.log('  Loaded ' + (data.INST?.length || 0) + ' institutions, ' + (data.RECS?.length || 0) + ' recs from disk');
-      return { INST: data.INST || [], RECS: data.RECS || [], ITEMS: data.ITEMS || [] };
+      console.log('  Loaded ' + (data.INST?.length || 0) + ' institutions, ' + (data.RECS?.length || 0) + ' recs, ' + (data.USERS?.length || 0) + ' users from disk');
+      return { INST: data.INST || [], RECS: data.RECS || [], ITEMS: data.ITEMS || [], USERS: data.USERS || [] };
     }
   } catch (err) {
     console.warn('  Failed to load data file:', err.message);
   }
-  return { INST: [], RECS: [], ITEMS: [] };
+  return { INST: [], RECS: [], ITEMS: [], USERS: [] };
 }
 
 function scheduleSave() {
@@ -26,7 +26,7 @@ function scheduleSave() {
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(function() {
     try {
-      fs.writeFileSync(DATA_FILE, JSON.stringify({ INST: INST, RECS: RECS, ITEMS: ITEMS }, null, 2), 'utf-8');
+      fs.writeFileSync(DATA_FILE, JSON.stringify({ INST: INST, RECS: RECS, ITEMS: ITEMS, USERS: USERS }, null, 2), 'utf-8');
     } catch (err) {
       console.error('  Failed to save data:', err.message);
     }
@@ -36,7 +36,7 @@ function scheduleSave() {
 function saveNow() {
   if (saveTimer) clearTimeout(saveTimer);
   try {
-    fs.writeFileSync(DATA_FILE, JSON.stringify({ INST: INST, RECS: RECS, ITEMS: ITEMS }, null, 2), 'utf-8');
+    fs.writeFileSync(DATA_FILE, JSON.stringify({ INST: INST, RECS: RECS, ITEMS: ITEMS, USERS: USERS }, null, 2), 'utf-8');
   } catch (err) {
     console.error('  Failed to save data:', err.message);
   }
@@ -52,10 +52,11 @@ function overrideSplice(arr) {
   arr.splice = function() { var r = orig.apply(arr, arguments); scheduleSave(); return r; };
 }
 
-function init(instArr, recsArr, itemsArr) {
+function init(instArr, recsArr, itemsArr, usersArr) {
   INST = instArr;
   RECS = recsArr;
   ITEMS = itemsArr;
+  USERS = usersArr;
 
   // Load persisted data
   var persisted = load();
@@ -65,17 +66,24 @@ function init(instArr, recsArr, itemsArr) {
   for (var i = 0; i < persisted.INST.length; i++) INST.push(persisted.INST[i]);
   for (var i = 0; i < persisted.RECS.length; i++) RECS.push(persisted.RECS[i]);
   for (var i = 0; i < persisted.ITEMS.length; i++) ITEMS.push(persisted.ITEMS[i]);
+  for (var i = 0; i < persisted.USERS.length; i++) USERS.push(persisted.USERS[i]);
   isLoading = false;
 
   // Override push/splice for auto-save
   overridePush(INST);
   overridePush(RECS);
   overridePush(ITEMS);
+  overridePush(USERS);
   overrideSplice(INST);
   overrideSplice(RECS);
   overrideSplice(ITEMS);
+  overrideSplice(USERS);
 
-  console.log('  Persistence: ' + INST.length + ' institutions, ' + RECS.length + ' recommendations');
+  console.log('  Persistence: ' + INST.length + ' institutions, ' + RECS.length + ' recommendations, ' + USERS.length + ' users');
 }
 
-module.exports = { init: init, saveNow: saveNow };
+function getUsers() {
+  return USERS;
+}
+
+module.exports = { init: init, saveNow: saveNow, getUsers: getUsers };
