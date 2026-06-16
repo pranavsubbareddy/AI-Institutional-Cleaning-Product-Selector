@@ -18,7 +18,7 @@ const allowedOrigins = (process.env.CORS_ORIGINS || [
   'http://localhost:3000',
   'http://localhost:4173',
   'https://pranavsubbareddy.github.io',
-  'https://ai-institutional-cleaning-product-s.vercel.app'
+  'https://ai-institutional-cleaning-product-s-rouge.vercel.app'
 ].join(',')).split(',').map(s => s.trim());
 
 app.use(cors({ origin: allowedOrigins, credentials: true }));
