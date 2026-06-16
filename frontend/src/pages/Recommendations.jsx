@@ -6,7 +6,6 @@ import LoadingState from '../components/LoadingState';
 import ErrorState from '../components/ErrorState';
 import html2pdf from 'html2pdf.js';
 import { sendReportToEmail, isEmailJSConfigured } from '../services/emailService';
-import EmailJSConfigWarning from '../components/EmailJSConfigWarning';
 
 export default function Recommendations() {
   const { id } = useParams();
@@ -291,7 +290,11 @@ export default function Recommendations() {
 
             {!isEmailJSConfigured() ? (
               <div className="space-y-4">
-                <EmailJSConfigWarning inline />
+                <div className="p-4 bg-surface-700/30 rounded-xl border border-surface-600/50">
+                  <p className="text-sm text-surface-400">
+                    Email reporting is not available at the moment.
+                  </p>
+                </div>
                 <div className="flex justify-end">
                   <button onClick={() => setShowEmailModal(false)} className="btn-secondary text-sm">
                     Close
