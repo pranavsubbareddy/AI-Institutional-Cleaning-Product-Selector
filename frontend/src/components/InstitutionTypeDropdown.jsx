@@ -2,8 +2,24 @@ import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { INSTITUTION_TYPES } from '../services/api';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const CUSTOM_OPTION = { value: 'custom', label: 'Custom (type your own)' };
+const CUSTOM_OPTION = { value: 'custom', label: 'Custom (type your own)', color: 'gray' };
 const ALL_OPTIONS = [...INSTITUTION_TYPES.filter(t => t.value !== 'custom'), CUSTOM_OPTION];
+
+const DOT_BG = {
+  red: 'bg-red-500', blue: 'bg-blue-500', amber: 'bg-amber-500', slate: 'bg-slate-500',
+  orange: 'bg-orange-500', yellow: 'bg-yellow-500', stone: 'bg-stone-500', pink: 'bg-pink-500',
+  lime: 'bg-lime-500', violet: 'bg-violet-500', emerald: 'bg-emerald-500', cyan: 'bg-cyan-500',
+  rose: 'bg-rose-500', purple: 'bg-purple-500', indigo: 'bg-indigo-500', teal: 'bg-teal-500',
+  gray: 'bg-gray-500'
+};
+
+const DOT_RING = {
+  red: 'ring-red-500/30', blue: 'ring-blue-500/30', amber: 'ring-amber-500/30', slate: 'ring-slate-500/30',
+  orange: 'ring-orange-500/30', yellow: 'ring-yellow-500/30', stone: 'ring-stone-500/30', pink: 'ring-pink-500/30',
+  lime: 'ring-lime-500/30', violet: 'ring-violet-500/30', emerald: 'ring-emerald-500/30', cyan: 'ring-cyan-500/30',
+  rose: 'ring-rose-500/30', purple: 'ring-purple-500/30', indigo: 'ring-indigo-500/30', teal: 'ring-teal-500/30',
+  gray: 'ring-gray-500/30'
+};
 
 export default function InstitutionTypeDropdown({ value, onChange, error, required = false }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -36,14 +52,19 @@ export default function InstitutionTypeDropdown({ value, onChange, error, requir
     return ALL_OPTIONS.filter(opt => opt.label.toLowerCase().includes(q));
   }, [search]);
 
+  const selectedColor = useMemo(() => {
+    if (!value) return null;
+    const preset = INSTITUTION_TYPES.find(t => t.value === value);
+    if (preset) return preset.color || 'gray';
+    return 'gray';
+  }, [value]);
+
   const displayLabel = useMemo(() => {
     if (!value) return 'Select institution type...';
     const preset = INSTITUTION_TYPES.find(t => t.value === value);
     if (preset) return preset.label;
     return 'Custom: ' + value;
   }, [value]);
-
-
 
   const isSelected = (optValue) => {
     if (optValue === 'custom') return isCustom;
@@ -145,8 +166,13 @@ export default function InstitutionTypeDropdown({ value, onChange, error, requir
         aria-expanded={isOpen}
         aria-haspopup="listbox"
       >
-        <span className="flex-1 text-sm truncate ${value ? 'text-surface-200' : 'text-surface-400'}">
-          {displayLabel}
+        <span className="flex items-center gap-2.5 flex-1 min-w-0">
+          {selectedColor && (
+            <span className={`flex-shrink-0 w-3 h-3 rounded-full ${DOT_BG[selectedColor] || 'bg-gray-500'} ring-1 ${DOT_RING[selectedColor] || 'ring-gray-500/30'}`} />
+          )}
+          <span className="text-sm truncate ${value ? 'text-surface-200' : 'text-surface-400'}">
+            {displayLabel}
+          </span>
         </span>
         {required && !value && (
           <span className="text-[10px] font-semibold text-red-400 bg-red-500/10 px-2 py-0.5 rounded-full flex-shrink-0">Required</span>
@@ -218,6 +244,7 @@ export default function InstitutionTypeDropdown({ value, onChange, error, requir
                         onClick={() => handleSelect(opt.value)} onMouseEnter={() => setActiveIndex(idx)}
                         className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all duration-150 ${active ? 'bg-cyan-500/10 text-surface-200' : selected ? 'bg-cyan-500/5 text-surface-200' : 'text-surface-300 hover:bg-surface-700/50 hover:text-surface-200'}`}
                       >
+                        <span className={`flex-shrink-0 w-4 h-4 rounded-full ${DOT_BG[opt.color] || 'bg-gray-500'} ring-2 ${selected || active ? (DOT_RING[opt.color] || 'ring-gray-500/30') : 'ring-transparent'}`} />
                         <span className="flex-1 text-sm font-medium">{highlightText(opt.label, search)}</span>
                         {selected && (
                           <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} className="w-6 h-6 rounded-full bg-cyan-500 flex items-center justify-center flex-shrink-0">
@@ -245,6 +272,11 @@ export default function InstitutionTypeDropdown({ value, onChange, error, requir
                     onClick={() => handleSelect('custom')}
                     className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all duration-150 ${isCustom ? 'bg-cyan-500/5 text-surface-200' : 'text-surface-300 hover:bg-surface-700/50 hover:text-surface-200'}`}
                   >
+                    <span className={`flex-shrink-0 w-4 h-4 rounded-full ${DOT_BG.gray} ring-2 ${isCustom ? 'ring-gray-500/30' : 'ring-transparent'} flex items-center justify-center`}>
+                      <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </span>
                     <span className="flex-1 text-sm font-medium">Custom (type your own)</span>
                     {isCustom && (
                       <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} className="w-6 h-6 rounded-full bg-cyan-500 flex items-center justify-center flex-shrink-0">

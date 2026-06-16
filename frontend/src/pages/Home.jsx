@@ -2,6 +2,14 @@ import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { api, formatCurrency, INSTITUTION_TYPES } from '../services/api';
 
+const COLOR_HEX = {
+  red: '#ef4444', blue: '#3b82f6', amber: '#f59e0b', slate: '#64748b',
+  orange: '#f97316', yellow: '#eab308', stone: '#78716c', pink: '#ec4899',
+  lime: '#84cc16', violet: '#8b5cf6', emerald: '#10b981', cyan: '#06b6d4',
+  rose: '#f43f5e', purple: '#a855f7', indigo: '#6366f1', teal: '#14b8a6',
+  gray: '#6b7280'
+};
+
 // ── Animated Counter Hook ──────────────────────────────────────────────────
 function useCountUp(target, duration = 2000, startOnView = true) {
   const [count, setCount] = useState(0);
@@ -536,6 +544,7 @@ export default function Home() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
           {featuredTypes.map((type) => (
             <Link key={type.value} to="/form" className="card p-4 sm:p-6 text-center hover:border-cyan-500/30 transition-all duration-300 group">
+              <span className="inline-block w-4 h-4 rounded-full mb-2" style={{ backgroundColor: COLOR_HEX[type.color] || '#6b7280', boxShadow: `0 0 0 2px ${(COLOR_HEX[type.color] || '#6b7280')}4D` }} />
               <p className="text-xs sm:text-sm font-medium text-surface-200 group-hover:text-cyan-400 transition-colors">{type.label}</p>
             </Link>
           ))}

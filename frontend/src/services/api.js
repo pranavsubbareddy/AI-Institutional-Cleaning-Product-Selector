@@ -131,23 +131,23 @@ export function getStatusColor(status) {
 
 // Institution type labels
 export const INSTITUTION_TYPES = [
-  { value: 'hospital', label: 'Hospital / Healthcare' },
-  { value: 'school', label: 'School / Educational' },
-  { value: 'hotel', label: 'Hotel / Hospitality' },
-  { value: 'office', label: 'Office / Corporate' },
-  { value: 'restaurant', label: 'Restaurant / Food Service' },
-  { value: 'factory', label: 'Factory / Industrial' },
-  { value: 'warehouse', label: 'Warehouse / Storage' },
-  { value: 'retail', label: 'Retail / Store' },
-  { value: 'gym', label: 'Gym / Fitness Center' },
-  { value: 'laboratory', label: 'Laboratory / Research' },
-  { value: 'pharmacy', label: 'Pharmacy / Medical Store' },
-  { value: 'airport', label: 'Airport / Transportation' },
-  { value: 'shopping_mall', label: 'Shopping Mall / Complex' },
-  { value: 'cinema', label: 'Cinema / Theater' },
-  { value: 'library', label: 'Library / Study Center' },
-  { value: 'community_center', label: 'Community Center / Hall' },
-  { value: 'custom', label: 'Custom (type your own)' }
+  { value: 'hospital', label: 'Hospital / Healthcare', color: 'red' },
+  { value: 'school', label: 'School / Educational', color: 'blue' },
+  { value: 'hotel', label: 'Hotel / Hospitality', color: 'amber' },
+  { value: 'office', label: 'Office / Corporate', color: 'slate' },
+  { value: 'restaurant', label: 'Restaurant / Food Service', color: 'orange' },
+  { value: 'factory', label: 'Factory / Industrial', color: 'yellow' },
+  { value: 'warehouse', label: 'Warehouse / Storage', color: 'stone' },
+  { value: 'retail', label: 'Retail / Store', color: 'pink' },
+  { value: 'gym', label: 'Gym / Fitness Center', color: 'lime' },
+  { value: 'laboratory', label: 'Laboratory / Research', color: 'violet' },
+  { value: 'pharmacy', label: 'Pharmacy / Medical Store', color: 'emerald' },
+  { value: 'airport', label: 'Airport / Transportation', color: 'cyan' },
+  { value: 'shopping_mall', label: 'Shopping Mall / Complex', color: 'rose' },
+  { value: 'cinema', label: 'Cinema / Theater', color: 'purple' },
+  { value: 'library', label: 'Library / Study Center', color: 'indigo' },
+  { value: 'community_center', label: 'Community Center / Hall', color: 'teal' },
+  { value: 'custom', label: 'Custom (type your own)', color: 'gray' }
 ];
 
 export const SURFACE_TYPES = [
