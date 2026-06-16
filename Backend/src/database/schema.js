@@ -181,7 +181,7 @@ function memQueryAll(sql, params) {
       const row = {};
       columns.forEach((col, i) => { row[col] = params[i] !== undefined ? params[i] : null; });
       memTable(tableName).push(row);
-      return []; // INSERT returns empty rows
+      return { affectedRows: 1 };
     }
 
     // ── SELECT ──────────────────────────────────────────────────────────
@@ -590,8 +590,7 @@ async function queryOne(sql, params = []) {
 
 async function run(sql, params = []) {
   if (!pool) {
-    memQueryAll(sql, params);
-    return { affectedRows: 1 };
+    return memQueryAll(sql, params);
   }
   const p = getPool();
   const [result] = await p.execute(sql, params);
