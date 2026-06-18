@@ -135,7 +135,8 @@ router.get('/institutions', async (req, res, next) => {
 
     const parsed = institutions.map(inst => ({
       ...inst,
-      surface_types: safeJsonParse(inst.surface_types, [])
+      surface_types: safeJsonParse(inst.surface_types, []),
+      metadata: safeJsonParse(inst.metadata, null)
     }));
 
     res.json({
