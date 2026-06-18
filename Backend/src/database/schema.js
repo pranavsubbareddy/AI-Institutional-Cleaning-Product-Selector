@@ -409,6 +409,36 @@ function normalizeSql(sql) {
   return sql.replace(/\s+/g, ' ').trim();
 }
 
+// Strip trailing ORDER BY / LIMIT / OFFSET clauses from a captured WHERE
+// fragment. The SELECT/UPDATE/DELETE regexes use non-greedy `.*` and capture
+// everything from "WHERE …" to end-of-string, so ORDER BY clauses leak into
+// the WHERE fragment and break memRowMatches. Detect them by keyword boundary
+// (whitespace, paren, or comma) and truncate.
+function stripTrailingClauses(whereClause) {
+  if (!whereClause) return whereClause;
+  const upper = whereClause.toUpperCase();
+  // Walk the string and find the earliest top-level position where a known
+  // trailing clause keyword starts.
+  const tailKeywords = ['ORDER BY', 'LIMIT', 'OFFSET', 'GROUP BY', 'HAVING'];
+  let cutAt = -1;
+  for (const kw of tailKeywords) {
+    let searchFrom = 0;
+    while (searchFrom < upper.length) {
+      const idx = upper.indexOf(kw, searchFrom);
+      if (idx === -1) break;
+      // Word boundary: must be at start, or preceded by whitespace / ( / ,
+      const prev = idx === 0 ? ' ' : upper[idx - 1];
+      if (/\s|\(|\,/.test(prev)) {
+        if (cutAt === -1 || idx < cutAt) cutAt = idx;
+        break;
+      }
+      searchFrom = idx + 1;
+    }
+  }
+  if (cutAt === -1) return whereClause.trim();
+  return whereClause.substring(0, cutAt).trim();
+}
+
 // In-memory queryAll implementation
 function memQueryAll(sql, params) {
   const s = normalizeSql(sql);
@@ -436,7 +466,12 @@ function memQueryAll(sql, params) {
       const isDistinct = !!selMatch[1];
       const columns = selMatch[2].trim();
       const tableName = selMatch[3];
-      const whereClause = selMatch[4] || '';
+      // Strip trailing ORDER BY / LIMIT / OFFSET clauses from the captured
+      // WHERE fragment. The regex above is non-greedy so it captures
+      // everything from "WHERE …" to end-of-string, including ORDER BY and
+      // LIMIT clauses that would otherwise poison memRowMatches.
+      let whereClause = selMatch[4] || '';
+      whereClause = stripTrailingClauses(whereClause);
       let rows = memTable(tableName).filter(row => memRowMatches(row, whereClause, params));
       if (isDistinct) {
         const seen = new Set();
@@ -462,7 +497,8 @@ function memQueryAll(sql, params) {
       if (!updMatch) return [];
       const tableName = updMatch[1];
       const setClause = updMatch[2];
-      const whereClause = (updMatch[3] || '').trim();
+      let whereClause = (updMatch[3] || '').trim();
+      whereClause = stripTrailingClauses(whereClause);
       const setParts = setClause.split(',').map(p => {
         const m = p.trim().match(/^`?(\w+)`?\s*=\s*\?$/);
         return m ? m[1] : null;
@@ -486,7 +522,8 @@ function memQueryAll(sql, params) {
       const delMatch = s.match(/DELETE\s+FROM\s+`?(\w+)`?(?:\s+WHERE\s+(.*))?$/i);
       if (!delMatch) return [];
       const tableName = delMatch[1];
-      const whereClause = (delMatch[2] || '').trim();
+      let whereClause = (delMatch[2] || '').trim();
+      whereClause = stripTrailingClauses(whereClause);
       const table = memTable(tableName);
       const before = table.length;
       const removedRows = table.filter(row => memRowMatches(row, whereClause, params));
