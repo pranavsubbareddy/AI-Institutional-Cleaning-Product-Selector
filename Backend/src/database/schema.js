@@ -84,55 +84,120 @@ function seedFromDisk() {
 // instance — without this, a POST handled by instance A is invisible to a GET
 // handled by instance B because /tmp/data.json was written by A but never
 // re-read by B. Call before every query to keep cross-instance state coherent.
+//
+// On Vercel, /tmp/data.json is the authoritative runtime store. The bundled
+// project-root data.json is consulted ONLY as a seed source on first cold
+// start. To survive deletes across cold starts, we also persist a
+// "tombstone" set in /tmp/inst_deletions.json — IDs of institutions that
+// have been deleted. On every reload we strip those IDs out of the seed.
 let diskMtimeMs = 0;
+let deletionsMtimeMs = 0;
 function reloadFromDiskIfChanged() {
   if (pool) return; // MySQL mode — disk reload is unnecessary
   try {
     const tmpPath = getTempDataFilePath();
     const rootPath = getDataFilePath();
-    let chosenPath = null;
-    let mtime = 0;
-    try {
-      const s1 = fs.statSync(tmpPath);
-      mtime = s1.mtimeMs;
-      chosenPath = tmpPath;
-    } catch { /* /tmp not present */ }
-    try {
-      const s2 = fs.statSync(rootPath);
-      if (s2.mtimeMs > mtime) { mtime = s2.mtimeMs; chosenPath = rootPath; }
-    } catch { /* project root not present */ }
-    if (!chosenPath) return;
-    if (mtime <= diskMtimeMs) return; // no change
-    diskMtimeMs = mtime;
-    const raw = fs.readFileSync(chosenPath, 'utf-8');
-    const data = JSON.parse(raw);
-    const tableMap = {
-      INST: 'institutions',
-      RECS: 'recommendations',
-      ITEMS: 'recommendation_items',
-      USERS: 'users',
-      PRODUCTS: 'products'
-    };
-    for (const [key, tableName] of Object.entries(tableMap)) {
-      memoryTables[tableName] = Array.isArray(data[key]) ? data[key].slice() : [];
+
+    let tmpMtime = 0;
+    let tmpExists = false;
+    try { tmpMtime = fs.statSync(tmpPath).mtimeMs; tmpExists = true; } catch { /* /tmp not present */ }
+
+    let snapshotPath = null;
+    let snapshotMtime = 0;
+    if (tmpExists) {
+      snapshotPath = tmpPath;
+      snapshotMtime = tmpMtime;
+    } else {
+      // Cold start with no /tmp — only consult bundled seed.
+      try {
+        const s2 = fs.statSync(rootPath);
+        snapshotPath = rootPath;
+        snapshotMtime = s2.mtimeMs;
+      } catch { /* neither file present */ }
     }
-    // Backfill user_id on orphan institution rows so per-user scoping works.
-    const users = memoryTables.users || [];
-    const ownerUid = users.length > 0 ? users[0].uid : null;
-    if (ownerUid) {
-      let backfilled = 0;
-      (memoryTables.institutions || []).forEach(row => {
-        if (row.user_id === undefined || row.user_id === null || row.user_id === '') {
-          row.user_id = ownerUid;
-          backfilled++;
-        }
-      });
-      if (backfilled > 0) {
-        console.log(`  [reload] Backfilled user_id on ${backfilled} orphan institution row(s)`);
-      }
+
+    if (!snapshotPath) return;
+    if (snapshotMtime > diskMtimeMs) {
+      diskMtimeMs = snapshotMtime;
+      applyDiskSnapshot(snapshotPath);
     }
+
+    // Always (re)apply deletions, even if the main snapshot mtime didn't
+    // advance — a delete operation only writes the tombstone file.
+    applyDeletionTombstones();
   } catch (err) {
     // Best-effort — fall through to in-memory state
+  }
+}
+
+function getDeletionTombstonePath() {
+  return path.join('/tmp', 'inst_deletions.json');
+}
+
+function applyDeletionTombstones() {
+  try {
+    const p = getDeletionTombstonePath();
+    const s = fs.statSync(p);
+    if (s.mtimeMs <= deletionsMtimeMs) return;
+    deletionsMtimeMs = s.mtimeMs;
+    const raw = fs.readFileSync(p, 'utf-8');
+    const list = JSON.parse(raw);
+    if (!Array.isArray(list) || list.length === 0) return;
+    const before = memoryTables.institutions.length;
+    memoryTables.institutions = memoryTables.institutions.filter(r => !list.includes(r.id));
+    const removed = before - memoryTables.institutions.length;
+    if (removed > 0) {
+      console.log(`  [reload] Applied ${removed} deletion tombstone(s)`);
+    }
+  } catch { /* no tombstone file yet — normal */ }
+}
+
+function applyDiskSnapshot(path) {
+  const raw = fs.readFileSync(path, 'utf-8');
+  const data = JSON.parse(raw);
+  const tableMap = {
+    INST: 'institutions',
+    RECS: 'recommendations',
+    ITEMS: 'recommendation_items',
+    USERS: 'users',
+    PRODUCTS: 'products'
+  };
+  for (const [key, tableName] of Object.entries(tableMap)) {
+    memoryTables[tableName] = Array.isArray(data[key]) ? data[key].slice() : [];
+  }
+  // Backfill user_id on orphan institution rows so per-user scoping works.
+  const users = memoryTables.users || [];
+  const ownerUid = users.length > 0 ? users[0].uid : null;
+  if (ownerUid) {
+    let backfilled = 0;
+    (memoryTables.institutions || []).forEach(row => {
+      if (row.user_id === undefined || row.user_id === null || row.user_id === '') {
+        row.user_id = ownerUid;
+        backfilled++;
+      }
+    });
+    if (backfilled > 0) {
+      console.log(`  [reload] Backfilled user_id on ${backfilled} orphan institution row(s)`);
+    }
+  }
+}
+
+// Append a deleted institution ID to the persistent tombstone file so it
+// stays gone across Vercel cold starts (where the bundled data.json would
+// otherwise be re-seeded and resurrect the row).
+function recordDeletion(id) {
+  try {
+    const p = getDeletionTombstonePath();
+    let list = [];
+    try { list = JSON.parse(fs.readFileSync(p, 'utf-8')); if (!Array.isArray(list)) list = []; } catch { list = []; }
+    if (!list.includes(id)) {
+      list.push(id);
+      fs.writeFileSync(p, JSON.stringify(list, null, 2), 'utf-8');
+      deletionsMtimeMs = Date.now(); // force re-apply next reload
+      console.log(`  [delete] Tombstoned institution ${id}`);
+    }
+  } catch (err) {
+    console.warn('  [delete] Could not write deletion tombstone:', err.message);
   }
 }
 
@@ -359,6 +424,7 @@ function memQueryAll(sql, params) {
       const row = {};
       columns.forEach((col, i) => { row[col] = params[i] !== undefined ? params[i] : null; });
       memTable(tableName).push(row);
+      everWritten = true;
       flushMemoryToDisk();
       return { affectedRows: 1 };
     }
@@ -411,7 +477,7 @@ function memQueryAll(sql, params) {
           count++;
         }
       });
-      if (count > 0) flushMemoryToDisk();
+      if (count > 0) { everWritten = true; flushMemoryToDisk(); }
       return { affectedRows: count };
     }
 
@@ -423,9 +489,18 @@ function memQueryAll(sql, params) {
       const whereClause = (delMatch[2] || '').trim();
       const table = memTable(tableName);
       const before = table.length;
+      const removedRows = table.filter(row => memRowMatches(row, whereClause, params));
       memoryTables[tableName] = table.filter(row => !memRowMatches(row, whereClause, params));
       const affected = before - (memoryTables[tableName] || []).length;
-      if (affected > 0) flushMemoryToDisk();
+      if (affected > 0) {
+        // Tombstone removed institution IDs so they survive cold starts on
+        // serverless (where the bundled data.json would otherwise resurrect them).
+        if (tableName === 'institutions') {
+          removedRows.forEach(r => { if (r.id) recordDeletion(r.id); });
+        }
+        everWritten = true;
+        flushMemoryToDisk();
+      }
       return { affectedRows: affected };
     }
   } catch (err) {
