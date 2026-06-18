@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { api, formatCurrency } from '../services/api';
 import LoadingState from '../components/LoadingState';
 import ErrorState from '../components/ErrorState';
@@ -9,6 +10,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [stats, setStats] = useState(null);
   const [institutions, setInstitutions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -121,15 +123,16 @@ export default function Dashboard() {
         surface_types: data.surface_types || [],
         hygiene_standard: data.hygiene_standard,
         budget: data.budget,
-        contact_name: data.contact_name,
-        contact_email: data.contact_email,
-        contact_phone: data.contact_phone,
-        address: data.address,
-        metadata: data.metadata
+        contact_name: user?.displayName || data.contact_name,
+        contact_email: user?.email || data.contact_email,
+        contact_phone: user?.phone || data.contact_phone,
+        address: data.address || '',
+        metadata: data.metadata || {}
       });
       setUndoToast(null);
-      setInstitutions(prev => [res.data.data, ...prev]);
+      setInstitutions(prev => [res.data, ...prev]);
     } catch (err) {
+      console.error('[Undo] Failed to restore institution:', err);
       // Show error toast
       setUndoToast({ id: null, name: 'Failed to undo deletion: ' + err.message, data: null, isError: true });
       undoTimeoutRef.current = setTimeout(() => {

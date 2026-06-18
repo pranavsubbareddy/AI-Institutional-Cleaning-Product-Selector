@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { api, SURFACE_TYPES, HYGIENE_LEVELS, BUDGET_LEVELS } from '../services/api';
 import InstitutionTypeDropdown from '../components/InstitutionTypeDropdown';
 import LoadingState from '../components/LoadingState';
@@ -66,6 +67,7 @@ const OPERATING_HOURS = [
 export default function EditInstitution() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [fetching, setFetching] = useState(true);
@@ -79,9 +81,9 @@ export default function EditInstitution() {
     surface_types: [],
     hygiene_standard: 'standard',
     budget: 'medium',
-    contact_name: '',
-    contact_email: '',
-    contact_phone: '',
+    contact_name: user?.displayName || '',
+    contact_email: user?.email || '',
+    contact_phone: user?.phone || '',
     address: '',
     floors: 1,
     occupants: 50,
@@ -113,9 +115,9 @@ export default function EditInstitution() {
         surface_types: d.surface_types || [],
         hygiene_standard: d.hygiene_standard || 'standard',
         budget: d.budget || 'medium',
-        contact_name: d.contact_name || '',
-        contact_email: d.contact_email || '',
-        contact_phone: d.contact_phone || '',
+        contact_name: user?.displayName || d.contact_name || '',
+        contact_email: user?.email || d.contact_email || '',
+        contact_phone: user?.phone || d.contact_phone || '',
         address: d.address || '',
         floors: m.floors || 1,
         occupants: m.occupants || 50,
@@ -164,9 +166,9 @@ export default function EditInstitution() {
         surface_types: formData.surface_types,
         hygiene_standard: formData.hygiene_standard,
         budget: formData.budget,
-        contact_name: formData.contact_name,
-        contact_email: formData.contact_email,
-        contact_phone: formData.contact_phone,
+        contact_name: user?.displayName || formData.contact_name,
+        contact_email: user?.email || formData.contact_email,
+        contact_phone: user?.phone || formData.contact_phone,
         address: formData.address || null,
         metadata: {
           floors: formData.floors,
@@ -445,7 +447,44 @@ export default function EditInstitution() {
           </div>
         </div>
 
-        {/* Address */}
+        {/* Contact Info (from auth) */}
+        <h2 className="text-base font-semibold text-surface-100 mb-5 flex items-center gap-2">
+          <svg className="w-5 h-5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+          Contact Information
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+          <div>
+            <label className="label">Contact Person</label>
+            <div className="input-field bg-surface-700/50 text-surface-300 flex items-center">
+              <svg className="w-4 h-4 mr-2 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              {user?.displayName || 'N/A'}
+            </div>
+          </div>
+          <div>
+            <label className="label">Contact Email</label>
+            <div className="input-field bg-surface-700/50 text-surface-300 flex items-center">
+              <svg className="w-4 h-4 mr-2 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              {user?.email || 'N/A'}
+            </div>
+          </div>
+          <div>
+            <label className="label">Contact Phone</label>
+            <div className="input-field bg-surface-700/50 text-surface-300 flex items-center">
+              <svg className="w-4 h-4 mr-2 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+              </svg>
+              {user?.phone || 'N/A'}
+            </div>
+          </div>
+        </div>
+
+        {/* Facility Address */}
         <h2 className="text-base font-semibold text-surface-100 mb-5 flex items-center gap-2">
           <svg className="w-5 h-5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />

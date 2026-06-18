@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { api, formatCurrency } from '../services/api';
 import LoadingState from '../components/LoadingState';
 import ErrorState from '../components/ErrorState';
@@ -8,6 +9,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 export default function DetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -142,14 +144,14 @@ export default function DetailPage() {
               ))}
             </div>
           </div>
-          {data.contact_name && (
-            <div>
-              <p className="text-[11px] text-surface-400 uppercase tracking-wider">Contact</p>
-              <p className="text-base font-medium text-surface-100 mt-1">{data.contact_name}</p>
-              {data.contact_email && <p className="text-sm text-surface-400">{data.contact_email}</p>}
-              {data.contact_phone && <p className="text-sm text-surface-400">{data.contact_phone}</p>}
-            </div>
-          )}
+          <div>
+            <p className="text-[11px] text-surface-400 uppercase tracking-wider">Contact Person</p>
+            <p className="text-base font-medium text-surface-100 mt-1">{user?.displayName || data.contact_name || 'N/A'}</p>
+            {user?.email && <p className="text-sm text-surface-400">{user.email}</p>}
+            {!user?.email && data.contact_email && <p className="text-sm text-surface-400">{data.contact_email}</p>}
+            {user?.phone && <p className="text-sm text-surface-400">{user.phone}</p>}
+            {!user?.phone && data.contact_phone && <p className="text-sm text-surface-400">{data.contact_phone}</p>}
+          </div>
         </div>
       </div>
 

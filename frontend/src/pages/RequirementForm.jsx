@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { api, SURFACE_TYPES, HYGIENE_LEVELS, BUDGET_LEVELS } from '../services/api';
 import InstitutionTypeDropdown from '../components/InstitutionTypeDropdown';
 import { sendFormWithReportEmail, isEmailJSConfigured } from '../services/emailService';
@@ -64,6 +65,7 @@ const OPERATING_HOURS = [
 
 export default function RequirementForm() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [step, setStep] = useState(1);
@@ -75,9 +77,9 @@ export default function RequirementForm() {
     surface_types: [],
     hygiene_standard: 'standard',
     budget: 'medium',
-    contact_name: '',
-    contact_email: '',
-    contact_phone: '',
+    contact_name: user?.displayName || '',
+    contact_email: user?.email || '',
+    contact_phone: user?.phone || '',
     address: '',
     // Advanced fields
     floors: 1,
@@ -119,9 +121,9 @@ export default function RequirementForm() {
         surface_types: formData.surface_types,
         hygiene_standard: formData.hygiene_standard,
         budget: formData.budget,
-        contact_name: formData.contact_name || null,
-        contact_email: formData.contact_email || null,
-        contact_phone: formData.contact_phone || null,
+        contact_name: user?.displayName || formData.contact_name || null,
+        contact_email: user?.email || formData.contact_email || null,
+        contact_phone: user?.phone || formData.contact_phone || null,
         address: formData.address || null,
         metadata: {
           floors: formData.floors,
@@ -140,12 +142,13 @@ export default function RequirementForm() {
       const institutionId = response.data.id;
       const recResponse = await api.processRecommendation(institutionId);
 
-      // Auto-send confirmation email if configured and contact email provided
+      // Auto-send confirmation email if configured and contact email available
+      const contactEmail = user?.email || formData.contact_email;
       let emailResult = { skipped: true };
-      if (formData.contact_email && isEmailJSConfigured()) {
+      if (contactEmail && isEmailJSConfigured()) {
         try {
           // Fire email in background - don't block navigation
-          const emailPromise = sendFormWithReportEmail(formData, recResponse.data);
+          const emailPromise = sendFormWithReportEmail({ ...formData, contact_email: contactEmail }, recResponse.data);
           const timeout = new Promise((_, reject) =>
             setTimeout(() => reject(new Error('timeout')), 8000)
           );
@@ -321,21 +324,33 @@ export default function RequirementForm() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="label">Contact Name</label>
-                <input type="text" name="contact_name" value={formData.contact_name} onChange={handleChange}
-                  className="input-field" placeholder="e.g., Dr. Sharma" />
+                <label className="label">Contact Person</label>
+                <div className="input-field bg-surface-700/50 text-surface-300 flex items-center">
+                  <svg className="w-4 h-4 mr-2 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  {user?.displayName || 'N/A'}
+                </div>
               </div>
               <div>
                 <label className="label">Contact Email</label>
-                <input type="email" name="contact_email" value={formData.contact_email} onChange={handleChange}
-                  className="input-field" placeholder="e.g., manager@hospital.com" />
+                <div className="input-field bg-surface-700/50 text-surface-300 flex items-center">
+                  <svg className="w-4 h-4 mr-2 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  {user?.email || 'N/A'}
+                </div>
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="label">Contact Phone</label>
-                <input type="tel" name="contact_phone" value={formData.contact_phone} onChange={handleChange}
-                  className="input-field" placeholder="e.g., +91 98765 43210" />
+                <div className="input-field bg-surface-700/50 text-surface-300 flex items-center">
+                  <svg className="w-4 h-4 mr-2 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                  </svg>
+                  {user?.phone || 'N/A'}
+                </div>
               </div>
               <div>
                 <label className="label">Address / Location</label>
@@ -523,9 +538,9 @@ export default function RequirementForm() {
                   <div className="flex justify-between"><dt className="text-surface-400">Floors</dt><dd className="text-surface-200">{formData.floors}</dd></div>
                   <div className="flex justify-between"><dt className="text-surface-400">Occupants</dt><dd className="text-surface-200">{formData.occupants}+</dd></div>
                   <div className="flex justify-between"><dt className="text-surface-400">Hours</dt><dd className="text-surface-200 capitalize">{OPERATING_HOURS.find(o=>o.value===formData.operating_hours)?.label||formData.operating_hours}</dd></div>
-                  {formData.contact_name && <div className="flex justify-between"><dt className="text-surface-400">Contact</dt><dd className="text-surface-200">{formData.contact_name}</dd></div>}
-                  {formData.contact_email && <div className="flex justify-between"><dt className="text-surface-400">Email</dt><dd className="text-surface-200 truncate max-w-[180px]">{formData.contact_email}</dd></div>}
-                  {formData.contact_phone && <div className="flex justify-between"><dt className="text-surface-400">Phone</dt><dd className="text-surface-200">{formData.contact_phone}</dd></div>}
+                  <div className="flex justify-between"><dt className="text-surface-400">Contact</dt><dd className="text-surface-200">{user?.displayName || formData.contact_name || 'N/A'}</dd></div>
+                  <div className="flex justify-between"><dt className="text-surface-400">Email</dt><dd className="text-surface-200 truncate max-w-[180px]">{user?.email || formData.contact_email || 'N/A'}</dd></div>
+                  <div className="flex justify-between"><dt className="text-surface-400">Phone</dt><dd className="text-surface-200">{user?.phone || formData.contact_phone || 'N/A'}</dd></div>
                 </dl>
               </div>
               <div className="bg-surface-700/30 rounded-xl p-4 border border-surface-600/50">
