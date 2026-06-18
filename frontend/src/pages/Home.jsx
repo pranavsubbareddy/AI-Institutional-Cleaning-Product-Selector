@@ -1,51 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
-import { api, formatCurrency, INSTITUTION_TYPES } from '../services/api';
-
-const COLOR_HEX = {
-  red: '#ef4444', blue: '#3b82f6', amber: '#f59e0b', slate: '#64748b',
-  orange: '#f97316', yellow: '#eab308', stone: '#78716c', pink: '#ec4899',
-  lime: '#84cc16', violet: '#8b5cf6', emerald: '#10b981', cyan: '#06b6d4',
-  rose: '#f43f5e', purple: '#a855f7', indigo: '#6366f1', teal: '#14b8a6',
-  gray: '#6b7280'
-};
-
-// ── Animated Counter Hook ──────────────────────────────────────────────────
-function useCountUp(target, duration = 2000, startOnView = true) {
-  const [count, setCount] = useState(0);
-  const [started, setStarted] = useState(!startOnView);
-  const ref = useRef(null);
-  const raf = useRef(null);
-
-  useEffect(() => {
-    if (!startOnView) return;
-    const el = ref.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) { setStarted(true); obs.disconnect(); } },
-      { threshold: 0.3 }
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [startOnView]);
-
-  useEffect(() => {
-    if (!started) return;
-    const startTime = performance.now();
-    const step = (now) => {
-      const elapsed = now - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      // easeOutExpo
-      const eased = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
-      setCount(Math.round(eased * target));
-      if (progress < 1) raf.current = requestAnimationFrame(step);
-    };
-    raf.current = requestAnimationFrame(step);
-    return () => { if (raf.current) cancelAnimationFrame(raf.current); };
-  }, [started, target, duration]);
-
-  return { count, ref };
-}
+import { Link, useNavigate } from 'react-router-dom';
+import { api, formatCurrency } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 // ── Reading Progress Bar ───────────────────────────────────────────────────
 function ReadingProgressBar() {
@@ -106,49 +62,6 @@ function FloatingParticles() {
   );
 }
 
-// ── Stat Card ──────────────────────────────────────────────────────────────
-function AnimatedStatCard({ target, label, icon, suffix = '', color = 'cyan', decimals = 0 }) {
-  const { count, ref } = useCountUp(target);
-  const colorMap = { cyan: 'text-cyan-400 border-cyan-500/20', emerald: 'text-emerald-400 border-emerald-500/20' };
-  const bgMap = { cyan: 'bg-cyan-500/10', emerald: 'bg-emerald-500/10' };
-  return (
-    <div ref={ref} className={`card p-5 sm:p-6 text-center border ${colorMap[color]} animate-slide-up`}>
-      <p className={`text-3xl sm:text-4xl font-bold ${color === 'cyan' ? 'text-cyan-400' : 'text-emerald-400'}`}>
-        {count.toLocaleString()}{suffix}
-      </p>
-      <p className="text-xs sm:text-sm text-surface-400 mt-1">{label}</p>
-    </div>
-  );
-}
-
-// ── Accordion ──────────────────────────────────────────────────────────────
-function Accordion({ items }) {
-  const [open, setOpen] = useState(null);
-  return (
-    <div className="space-y-3">
-      {items.map((item, i) => (
-        <div key={i} className="card overflow-hidden">
-          <button
-            onClick={() => setOpen(open === i ? null : i)}
-            className="w-full flex items-center justify-between p-4 sm:p-5 text-left transition-colors hover:bg-surface-700/30"
-          >
-            <span className="font-medium text-surface-100 text-sm sm:text-base pr-2">{item.q}</span>
-            <svg
-              className={`w-5 h-5 flex-shrink-0 text-surface-400 transition-transform duration-300 ${open === i ? 'rotate-180' : ''}`}
-              fill="none" viewBox="0 0 24 24" stroke="currentColor"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          <div className={`transition-all duration-300 overflow-hidden ${open === i ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
-            <p className="px-4 sm:px-5 pb-4 sm:pb-5 text-sm text-surface-400 leading-relaxed">{item.a}</p>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 // ── Section Reveal Hook ─────────────────────────────────────────────────────
 function useReveal(options = { threshold: 0.15 }) {
   const [revealed, setRevealed] = useState(false);
@@ -202,15 +115,11 @@ function SectionHeader({ badge, title, subtitle, badgeColor = 'cyan' }) {
 
 // ── Section Navigation ──────────────────────────────────────────────────────
 const SECTIONS = [
-  { id: 'stats', label: 'Stats', icon: '📊' },
   { id: 'features', label: 'How It Works', icon: '⚡' },
-  { id: 'types', label: 'Facilities', icon: '🏢' },
-  { id: 'testimonials', label: 'Testimonials', icon: '⭐' },
-  { id: 'faq', label: 'FAQ', icon: '❓' },
 ];
 
 function SectionNav() {
-  const [activeId, setActiveId] = useState('stats');
+  const [activeId, setActiveId] = useState('features');
   const navRef = useRef(null);
 
   useEffect(() => {
@@ -262,21 +171,144 @@ function SectionNav() {
   );
 }
 
-// ── Testimonial Card ────────────────────────────────────────────────────────
-function TestimonialCard({ quote, author, role, delay = 0 }) {
+// ── Main Home Page ─────────────────────────────────────────────────────────
+// ── Dashboard Card (for authenticated views) ──────────────────────────────
+function DashboardCard({ to, icon, label, desc, color = 'cyan', value }) {
+  const colorMap = {
+    cyan: 'from-cyan-600 to-emerald-600 border-cyan-500/30',
+    amber: 'from-amber-600 to-orange-600 border-amber-500/30',
+    purple: 'from-purple-600 to-pink-600 border-purple-500/30',
+  };
+  const iconColorMap = { cyan: 'text-cyan-400', amber: 'text-amber-400', purple: 'text-purple-400' };
   return (
-    <div className="card p-5 sm:p-6 animate-slide-up" style={{ animationDelay: `${delay}ms` }}>
-      <div className="flex gap-1 mb-3">
-        {[...Array(5)].map((_, i) => (
-          <svg key={i} className="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+    <Link to={to} className="card p-5 hover:border-cyan-500/30 transition-all duration-300 group animate-slide-up">
+      <div className="flex items-start gap-4">
+        <div className={'w-12 h-12 rounded-xl bg-gradient-to-br ' + (colorMap[color] || colorMap.cyan) + ' flex items-center justify-center flex-shrink-0 shadow-lg'}>
+          <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={icon} />
           </svg>
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="font-semibold text-surface-100 group-hover:text-cyan-400 transition-colors">{label}</h3>
+          <p className="text-xs text-surface-400 mt-0.5">{desc}</p>
+          {value !== undefined && (
+            <p className={'text-sm font-bold mt-1.5 ' + (iconColorMap[color] || iconColorMap.cyan)}>{value}</p>
+          )}
+        </div>
+        <svg className="w-5 h-5 text-surface-500 group-hover:text-cyan-400 transition-colors flex-shrink-0 mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </div>
+    </Link>
+  );
+}
+
+// ── Admin Home View ───────────────────────────────────────────────────────
+function AdminHome({ overview, ops }) {
+  const navigate = useNavigate();
+  const adminCards = [
+    { to: '/admin', icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z', label: 'System Dashboard', desc: 'View system-wide metrics and activity logs', color: 'amber', value: null },
+    { to: '/admin-portal', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z', label: 'Admin Portal', desc: 'Operations dashboard with role-switching', color: 'amber', value: null },
+    { to: '/dashboard', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z', label: 'B2B Dashboard', desc: 'Analytics and facility management', color: 'emerald', value: null },
+  ];
+  const stats = [
+    { label: 'Total Facilities', value: overview?.total_institutions || 0, color: 'cyan' },
+    { label: 'Registered Users', value: overview?.total_users || 0, color: 'purple' },
+    { label: 'Pipeline Value', value: formatCurrency(overview?.total_estimated_cost || 0), color: 'emerald' },
+    { label: 'Active Recs', value: overview?.active_recommendations || 0, color: 'amber' },
+  ];
+  return (
+    <div className="animate-fade-in max-w-5xl mx-auto px-4 py-8 sm:py-12">
+      <div className="flex items-center gap-3 mb-8">
+        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/20">
+          <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+          </svg>
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold text-surface-100">Admin Dashboard</h1>
+          <p className="text-sm text-surface-400">System overview — manage facilities, users, and operations</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {stats.map((s, i) => (
+          <div key={i} className={'card p-4 border-l-4 border-l-' + s.color + '-500'}>
+            <p className="text-[11px] text-surface-400 uppercase tracking-wider font-medium">{s.label}</p>
+            <p className={'text-xl font-bold mt-1 text-' + s.color + '-400'}>{s.value}</p>
+          </div>
         ))}
       </div>
-      <p className="text-sm text-surface-300 leading-relaxed italic">"{quote}"</p>
-      <div className="mt-4 pt-3 border-t border-surface-700/50">
-        <p className="text-sm font-medium text-surface-100">{author}</p>
-        <p className="text-xs text-surface-400">{role}</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {adminCards.map((card, i) => (
+          <DashboardCard key={i} {...card} />
+        ))}
+      </div>
+      <div className="mt-8 flex gap-3">
+        <button onClick={() => navigate('/form')} className="btn-primary text-sm">
+          <svg className="w-4 h-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+          </svg>
+          New Facility
+        </button>
+        <button onClick={() => navigate('/admin')} className="btn-secondary text-sm">
+          <svg className="w-4 h-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+          </svg>
+          Full Analytics
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── User Home View ────────────────────────────────────────────────────────
+function UserHome({ stats, user }) {
+  const navigate = useNavigate();
+  const userCards = [
+    { to: '/dashboard', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z', label: 'My Dashboard', desc: 'Track facilities, recommendations & costs', color: 'emerald' },
+    { to: '/profile', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', label: 'My Profile', desc: 'Manage your account settings', color: 'purple' },
+  ];
+  const overview = stats?.overview || {};
+  const userStatCards = [
+    { label: 'My Facilities', value: overview.total_institutions || 0, color: 'cyan' },
+    { label: 'Recommendations', value: overview.active_recommendations || 0, color: 'emerald' },
+    { label: 'Pipeline Value', value: formatCurrency(overview.total_estimated_cost || 0), color: 'amber' },
+  ];
+  return (
+    <div className="animate-fade-in max-w-5xl mx-auto px-4 py-8 sm:py-12">
+      <div className="flex items-center gap-3 mb-8">
+        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+          <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold text-surface-100">Welcome back, {user?.displayName || 'User'}</h1>
+          <p className="text-sm text-surface-400">Manage your facilities and cleaning recommendations</p>
+        </div>
+      </div>
+      {overview.total_institutions > 0 && (
+        <div className="grid grid-cols-3 gap-4 mb-8">
+          {userStatCards.map((s, i) => (
+            <div key={i} className={'card p-4 border-l-4 border-l-' + s.color + '-500'}>
+              <p className="text-[11px] text-surface-400 uppercase tracking-wider">{s.label}</p>
+              <p className={'text-xl font-bold mt-1 text-' + s.color + '-400'}>{s.value}</p>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {userCards.map((card, i) => (
+          <DashboardCard key={i} {...card} />
+        ))}
+      </div>
+      <div className="mt-8">
+        <button onClick={() => navigate('/form')} className="btn-primary text-sm">
+          <svg className="w-4 h-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+          </svg>
+          Get New Recommendations
+        </button>
       </div>
     </div>
   );
@@ -284,73 +316,70 @@ function TestimonialCard({ quote, author, role, delay = 0 }) {
 
 // ── Main Home Page ─────────────────────────────────────────────────────────
 export default function Home() {
+  const navigate = useNavigate();
+  const { user, isAuthenticated } = useAuth();
   const [stats, setStats] = useState(null);
-  const [products, setProducts] = useState([]);
-  const [institutionsCount, setInstitutionsCount] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [testimonialsVisible, setTestimonialsVisible] = useState(false);
-  const testimonialsRef = useRef(null);
+  const [adminData, setAdminData] = useState(null);
 
-  // Fetch dynamic data
+  const [loading, setLoading] = useState(true);
+
+  // Fetch dynamic data based on role
   useEffect(() => {
     async function fetchData() {
       try {
-        const [statsRes, prodRes, instRes] = await Promise.allSettled([
-          api.getDashboardStats(),
-          api.getProducts({ limit: 6 }),
-          api.getInstitutions({ limit: 1 }),
-        ]);
-        if (statsRes.status === 'fulfilled') setStats(statsRes.value.data);
-        if (prodRes.status === 'fulfilled') setProducts(prodRes.value.data?.products || prodRes.value.data || []);
-        if (instRes.status === 'fulfilled') {
-          const overview = statsRes.status === 'fulfilled' ? statsRes.value.data?.overview : null;
-          setInstitutionsCount(overview?.total_institutions || instRes.value.data?.length || 0);
+        if (user?.role === 'admin') {
+          // Admin: fetch system-wide data
+          const res = await api.getAdminDashboard();
+          if (res.success) setAdminData(res.data);
+        } else if (isAuthenticated) {
+          // Regular user: fetch personal stats
+          const [statsRes] = await Promise.allSettled([api.getDashboardStats()]);
+          if (statsRes.status === 'fulfilled') setStats(statsRes.value.data);
+        } else {
+          // Unauthenticated: fetch public stats
+          const [statsRes] = await Promise.allSettled([
+            api.getDashboardStats(),
+          ]);
+          if (statsRes.status === 'fulfilled') setStats(statsRes.value.data);
         }
-      } catch (_) { /* silently fall back to static */ }
+      } catch (_) { /* silently fall back */ }
       setLoading(false);
     }
     fetchData();
-  }, []);
+  }, [isAuthenticated, user]);
 
-  // Observers for testimonials animation
+  // Reset loading when auth state changes (for re-fetch on login)
   useEffect(() => {
-    const el = testimonialsRef.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) { setTestimonialsVisible(true); obs.disconnect(); } },
-      { threshold: 0.2 }
+    setLoading(true);
+  }, [isAuthenticated]);
+
+  // If authenticated, render role-specific views
+  if (isAuthenticated) {
+    if (user?.role === 'admin') {
+      return (
+        <div className="min-h-screen">
+          <AdminHome overview={adminData?.overview} ops={adminData?.operations} />
+          <footer className="max-w-5xl mx-auto px-4 py-6 border-t border-surface-700/50 mt-8">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-surface-500">
+              <p>&copy; {new Date().getFullYear()} Ganga Maxx Marketplace. All rights reserved.</p>
+              <p>Admin Access</p>
+            </div>
+          </footer>
+        </div>
+      );
+    }
+    return (
+      <div className="min-h-screen">
+        <UserHome stats={stats} user={user} />
+        <footer className="max-w-5xl mx-auto px-4 py-6 border-t border-surface-700/50 mt-8">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-surface-500">
+            <p>&copy; {new Date().getFullYear()} Ganga Maxx Marketplace. All rights reserved.</p>
+            <p>Welcome, {user?.displayName || 'User'}</p>
+          </div>
+        </footer>
+      </div>
     );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, []);
-
-  const overview = stats?.overview || {};
-  const defaultStats = {
-    products: products.length || 12,
-    institutions: institutionsCount || 0,
-    monthlySavings: overview.total_estimated_cost ? Math.round(overview.total_estimated_cost * 0.15) : 0,
-    facilities: institutionsCount || 0,
-  };
-
-  // Featured institution types for grid
-  const featuredTypes = INSTITUTION_TYPES.slice(0, 4);
-
-  // Testimonials data
-  const testimonials = [
-    { quote: 'The AI recommendations were spot-on for our hospital. We reduced cleaning supply costs by 22% while maintaining medical-grade hygiene standards.', author: 'Dr. Priya Sharma', role: 'Chief Admin, AIIMS Delhi' },
-    { quote: 'Saved hours of manual product research. The dashboard gives us full visibility into our cleaning budget across all our hotel properties.', author: 'Vikram Mehta', role: 'Operations Head, Taj Hotels' },
-    { quote: 'As a school, we needed eco-friendly, fragrance-free products. The AI perfectly matched our requirements within our tight budget.', author: 'Anita Desai', role: 'Principal, Delhi Public School' },
-  ];
-
-  // FAQ data
-  const faqs = [
-    { q: 'How does the AI recommendation engine work?', a: 'Our engine analyzes your facility type, surface composition, hygiene requirements, budget, and equipment availability. It then matches these parameters against our comprehensive product database of Ganga Maxx cleaning products using a multi-factor scoring algorithm that considers compatibility, cost-efficiency, safety compliance, and usage optimization.' },
-    { q: 'Is there any cost to use the recommendation tool?', a: 'No, the AI-powered recommendation tool is completely free to use. You only pay when you place an order for the recommended products through Ganga Maxx Marketplace.' },
-    { q: 'How accurate are the cost estimates?', a: 'Cost estimates are based on current Ganga Maxx pricing and standard industry usage rates. They are highly accurate for budget planning purposes. Final costs may vary based on specific order quantities, contract pricing, and any applicable volume discounts.' },
-    { q: 'Can I get recommendations for multiple facilities?', a: 'Yes! You can create separate facility profiles for each of your locations. The dashboard provides both individual recommendations and aggregated analytics across all your facilities.' },
-    { q: 'How do I place an order for the recommended products?', a: 'After reviewing your recommendations, you can generate a quotation summary and contact the Ganga Maxx sales team directly. Your recommendation report includes all SKU details, quantities, and contact information for easy ordering.' },
-    { q: 'What types of facilities does this support?', a: 'The platform supports hospitals, schools, hotels, offices, restaurants, factories, warehouses, and retail stores. Each facility type has tailored product matching based on industry-specific requirements.' },
-  ];
+  }
 
   return (
     <div className="animate-fade-in">
@@ -424,23 +453,6 @@ export default function Home() {
 
       {/* Section Navigation */}
       <SectionNav />
-
-      {/* ═══════════════════════════════════════════════════════════════════
-         LIVE STATS COUNTERS
-         ═══════════════════════════════════════════════════════════════════ */}
-      <section id="stats" className="py-12 sm:py-16 scroll-mt-28">
-        <SectionHeader
-          badge={<><span className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-pulse mr-2"></span>Live Platform Stats</>}
-          title="Trusted by Institutions Across India"
-          subtitle="Real-time platform metrics powered by our AI engine"
-        />
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 max-w-4xl mx-auto px-2">
-          <AnimatedStatCard target={defaultStats.products || 12} label="Cleaning Products" suffix="+" color="cyan" />
-          <AnimatedStatCard target={defaultStats.institutions || 20} label="Facilities Served" suffix="+" color="emerald" />
-          <AnimatedStatCard target={defaultStats.monthlySavings || 50000} label="Avg. Monthly Savings" suffix="" color="cyan" />
-          <AnimatedStatCard target={defaultStats.facilities || 20} label="Active Facilities" suffix="+" color="emerald" />
-        </div>
-      </section>
 
       {/* ═══════════════════════════════════════════════════════════════════
          FEATURES GRID
@@ -530,54 +542,6 @@ export default function Home() {
             </div>
             <div className="w-full lg:w-1/2 lg:pr-8 hidden lg:block" />
           </div>
-        </div>
-      </section>
-
-      {/* ═══════════════════════════════════════════════════════════════════
-         INSTITUTION TYPES GRID
-         ═══════════════════════════════════════════════════════════════════ */}
-      <section id="types" className="py-12 sm:py-16 scroll-mt-28">
-        <SectionHeader
-          title="Built for Every Facility Type"
-          subtitle="Tailored recommendations for all institutional environments"
-        />
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-          {featuredTypes.map((type) => (
-            <Link key={type.value} to="/form" className="card p-4 sm:p-6 text-center hover:border-cyan-500/30 transition-all duration-300 group">
-              <span className="inline-block w-4 h-4 rounded-full mb-2" style={{ backgroundColor: COLOR_HEX[type.color] || '#6b7280', boxShadow: `0 0 0 2px ${(COLOR_HEX[type.color] || '#6b7280')}4D` }} />
-              <p className="text-xs sm:text-sm font-medium text-surface-200 group-hover:text-cyan-400 transition-colors">{type.label}</p>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      {/* ═══════════════════════════════════════════════════════════════════
-         TESTIMONIALS
-         ═══════════════════════════════════════════════════════════════════ */}
-      <section id="testimonials" ref={testimonialsRef} className="py-12 sm:py-16 scroll-mt-28">
-        <SectionHeader
-          badge="Testimonials"
-          badgeColor="emerald"
-          title="Trusted by Industry Leaders"
-          subtitle="Hear from facility managers who transformed their cleaning operations"
-        />
-        <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 transition-all duration-700 ${testimonialsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-          {testimonials.map((t, i) => (
-            <TestimonialCard key={i} {...t} delay={i * 100} />
-          ))}
-        </div>
-      </section>
-
-      {/* ═══════════════════════════════════════════════════════════════════
-         FAQ SECTION
-         ═══════════════════════════════════════════════════════════════════ */}
-      <section id="faq" className="py-12 sm:py-16 scroll-mt-28">
-        <SectionHeader
-          title="Frequently Asked Questions"
-          subtitle="Everything you need to know about the platform"
-        />
-        <div className="max-w-3xl mx-auto px-2">
-          <Accordion items={faqs} />
         </div>
       </section>
 

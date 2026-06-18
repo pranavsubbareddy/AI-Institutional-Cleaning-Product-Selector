@@ -102,6 +102,14 @@ export const api = {
   // Dashboard
   getDashboardStats: () => fetchApi('/dashboard/stats'),
   getDashboardInstitutions: () => fetchApi('/dashboard/institutions'),
+  getDashboardSummary: () => fetchApi('/dashboard/summary'),
+
+  // Admin Dashboard
+  getAdminDashboard: () => fetchApi('/admin/dashboard'),
+
+  // Admin User Management
+  getAdminUsers: () => fetchApi('/admin/users'),
+  updateUserRole: (uid, role) => fetchApi(`/admin/users/${uid}/role`, { method: 'PUT', body: JSON.stringify({ role }) }),
 };
 
 // Helper to format currency

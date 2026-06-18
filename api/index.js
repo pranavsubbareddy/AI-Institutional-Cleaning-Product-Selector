@@ -1,22 +1,10 @@
-// ═══════════════════════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────────────────────────
 // Vercel Serverless Entry Point
-// ═══════════════════════════════════════════════════════════════════════
-//
-// Uses in-memory storage via Backend/server.js (data.json for persistence).
-// On Vercel, data.json can be read (deployed with code) but writes are
-// ephemeral — data resets on cold starts. For persistent storage, set
-// DATABASE_URL in Vercel env and switch to the MySQL-backed db.js below.
-//
-// To use MySQL: set DATABASE_URL in Vercel project env, then change:
-//   const app = require('./db');   // ← uncomment this
-//   // const app = require('../Backend/server');  // ← comment this
-// ═══════════════════════════════════════════════════════════════════════
-
-// Prevent dotenv from reading .env in Vercel production (env vars are
-// injected by Vercel's dashboard instead)
-if (process.env.VERCEL !== '1') {
-  require('dotenv').config({ override: true });
-}
+// ─────────────────────────────────────────────────────────────────────────
+// Vercel routes /api/* requests to this file as a serverless function.
+// It re-exports the Express app from the main server.
+// This file serves as the bridge between Vercel's serverless runtime
+// and the Express application defined in Backend/server.js.
 
 const app = require('../Backend/server');
 

@@ -3,135 +3,36 @@ require('dotenv').config();
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 const { initializeSchema, run, queryAll } = require('./schema');
-const { PRODUCT_KNOWLEDGE_BASE } = require('../engine/recommendationEngine');
 
 async function seedDatabase() {
   await initializeSchema();
 
-  const existing = await queryAll('SELECT COUNT(*) as count FROM products');
-  if (existing.length > 0 && existing[0].count > 0) {
-    console.log('Database already seeded. Drop tables or use TRUNCATE to re-seed.');
-    return;
-  }
-
   console.log('Seeding database...');
+  console.log('  Skipping hardcoded product seed — all products are AI-generated dynamically.');
 
-  // Map product IDs to SKUs
-  const productIdToSku = {
-    'prod-gpc-001': 'GPC-5L-001',
-    'prod-dsf-002': 'HDS-5L-002',
-    'prod-gls-003': 'GLS-5L-003',
-    'prod-flr-004': 'FLR-5L-004',
-    'prod-crp-005': 'CRP-5L-005',
-    'prod-stl-006': 'STL-5L-006',
-    'prod-wpd-007': 'WPD-5L-007',
-    'prod-tlt-008': 'TLT-5L-008',
-    'prod-hnd-009': 'HND-5L-009',
-    'prod-hdd-010': 'HDD-5L-010',
-    'prod-bio-011': 'BIO-5L-011',
-    'prod-air-012': 'AIR-5L-012'
-  };
-
-  // Seed products
-  for (const p of PRODUCT_KNOWLEDGE_BASE.products) {
-    await run(
-      `INSERT INTO products (id, sku, name, description, category, surface_types, dilution_ratio, unit, unit_price, coverage_per_unit, safety_notes, usage_guidance, hygiene_level)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [p.id, productIdToSku[p.id] || p.id, p.name, p.category + ' for institutional cleaning', p.category,
-       JSON.stringify(p.surface_types), p.dilution_ratio, p.unit, p.unit_price,
-       p.coverage_per_unit, p.safety_notes, p.usage_guidance, p.hygiene_level]
-    );
-  }
-  console.log('  ' + PRODUCT_KNOWLEDGE_BASE.products.length + ' products seeded');
-
-  // Seed warehouses
-  const warehouses = [
-    { id: 'wh-001', name: 'Ganga Main Warehouse - Mumbai', location: 'Andheri East, Mumbai - 400093', contact_person: 'Rajesh Kumar', contact_phone: '+91-9876543210' },
-    { id: 'wh-002', name: 'Ganga Distribution Center - Delhi', location: 'Okhla Industrial Area, Delhi - 110020', contact_person: 'Sunil Verma', contact_phone: '+91-9876543211' },
-    { id: 'wh-003', name: 'Ganga Storage - Bangalore', location: 'Whitefield, Bangalore - 560066', contact_person: 'Priya Sharma', contact_phone: '+91-9876543212' },
-    { id: 'wh-004', name: 'Ganga Regional Hub - Chennai', location: 'Guindy, Chennai - 600032', contact_person: 'Venkatesh Rao', contact_phone: '+91-9876543213' }
+  // ── Seed portal users ─────────────────────────────────────────────────────
+  // Pre-defined accounts for each role with role-based access
+  const portalUsers = [
+    { email: 'manager@ganga-maxx.com', pass: 'manager@123', name: 'Facility Manager', role: 'field_staff', phone: '+91-9000000001' },
+    { email: 'dealer@ganga-maxx.com', pass: 'dealer@123', name: 'Dealer Distributor', role: 'dealer', phone: '+91-9000000002' },
+    { email: 'salesman@ganga-maxx.com', pass: 'salesman@123', name: 'Field Sales Agent', role: 'salesman', phone: '+91-9000000003' },
+    { email: 'warehouse@ganga-maxx.com', pass: 'warehouse@123', name: 'Warehouse Manager', role: 'warehouse_staff', phone: '+91-9000000004' },
+    { email: 'accounts@ganga-maxx.com', pass: 'accounts@123', name: 'Accounts Manager', role: 'accounts_manager', phone: '+91-9000000005' },
+    { email: 'compliance@ganga-maxx.com', pass: 'compliance@123', name: 'Compliance Officer', role: 'compliance_admin', phone: '+91-9000000006' },
+    { email: 'salesadmin@ganga-maxx.com', pass: 'salesadmin@123', name: 'Sales Administrator', role: 'sales_admin', phone: '+91-9000000007' },
   ];
-  for (const w of warehouses) {
-    await run(
-      'INSERT INTO warehouses (id, name, location, contact_person, contact_phone) VALUES (?, ?, ?, ?, ?)',
-      [w.id, w.name, w.location, w.contact_person, w.contact_phone]
-    );
-  }
-  console.log('  ' + warehouses.length + ' warehouses seeded');
 
-  // Seed stock batches
-  const stockData = [
-    { id: 'stk-001', product_id: 'prod-gpc-001', warehouse_id: 'wh-001', batch: 'BATCH-GPC-2024-001', qty: 500, expiry: '2026-12-31' },
-    { id: 'stk-002', product_id: 'prod-dsf-002', warehouse_id: 'wh-001', batch: 'BATCH-DSF-2024-001', qty: 300, expiry: '2026-10-31' },
-    { id: 'stk-003', product_id: 'prod-gls-003', warehouse_id: 'wh-002', batch: 'BATCH-GLS-2024-001', qty: 400, expiry: '2026-11-30' },
-    { id: 'stk-004', product_id: 'prod-flr-004', warehouse_id: 'wh-002', batch: 'BATCH-FLR-2024-001', qty: 350, expiry: '2026-12-31' },
-    { id: 'stk-005', product_id: 'prod-hnd-009', warehouse_id: 'wh-003', batch: 'BATCH-HND-2024-001', qty: 1000, expiry: '2026-09-30' },
-    { id: 'stk-006', product_id: 'prod-hdd-010', warehouse_id: 'wh-003', batch: 'BATCH-HDD-2024-001', qty: 200, expiry: '2026-08-31' }
-  ];
-  for (const s of stockData) {
-    await run(
-      'INSERT INTO stock_batches (id, product_id, warehouse_id, batch_number, quantity, expiry_date) VALUES (?, ?, ?, ?, ?, ?)',
-      [s.id, s.product_id, s.warehouse_id, s.batch, s.qty, s.expiry]
-    );
-  }
-  console.log('  ' + stockData.length + ' stock batches seeded');
-
-  // Seed quotation kits
-  const kits = [
-    { id: 'kit-001', name: 'Hospital Essentials Kit', desc: 'Complete cleaning kit for healthcare facilities', products: JSON.stringify(['prod-dsf-002', 'prod-gpc-001', 'prod-hnd-009', 'prod-tlt-008', 'prod-flr-004']), price: 1210 },
-    { id: 'kit-002', name: 'Office Cleaning Kit', desc: 'Essential cleaning products for corporate offices', products: JSON.stringify(['prod-gpc-001', 'prod-gls-003', 'prod-hnd-009', 'prod-air-012', 'prod-flr-004']), price: 1070 },
-    { id: 'kit-003', name: 'Restaurant Hygiene Kit', desc: 'Complete cleaning for food service establishments', products: JSON.stringify(['prod-hdd-010', 'prod-dsf-002', 'prod-flr-004', 'prod-gpc-001', 'prod-tlt-008']), price: 1350 },
-    { id: 'kit-004', name: 'Hotel Hospitality Kit', desc: 'Premium cleaning for hotels and hospitality', products: JSON.stringify(['prod-gpc-001', 'prod-gls-003', 'prod-crp-005', 'prod-tlt-008', 'prod-air-012', 'prod-stl-006']), price: 1650 }
-  ];
-  for (const k of kits) {
-    await run(
-      'INSERT INTO quotation_kits (id, name, description, products, total_price) VALUES (?, ?, ?, ?, ?)',
-      [k.id, k.name, k.desc, k.products, k.price]
-    );
-  }
-  console.log('  ' + kits.length + ' quotation kits seeded');
-
-  // Seed tier discounts
-  const discounts = [
-    { id: 'disc-001', product_id: 'prod-gpc-001', min: 0, max: 10, pct: 0 },
-    { id: 'disc-002', product_id: 'prod-gpc-001', min: 11, max: 50, pct: 5 },
-    { id: 'disc-003', product_id: 'prod-gpc-001', min: 51, max: null, pct: 10 },
-    { id: 'disc-004', product_id: 'prod-dsf-002', min: 0, max: 10, pct: 0 },
-    { id: 'disc-005', product_id: 'prod-dsf-002', min: 11, max: 50, pct: 8 },
-    { id: 'disc-006', product_id: 'prod-dsf-002', min: 51, max: null, pct: 15 }
-  ];
-  for (const d of discounts) {
-    await run(
-      'INSERT INTO tier_discounts (id, product_id, min_quantity, max_quantity, discount_percent) VALUES (?, ?, ?, ?, ?)',
-      [d.id, d.product_id, d.min, d.max, d.pct]
-    );
-  }
-  console.log('  ' + discounts.length + ' tier discounts seeded');
-
-  // Seed MSDS documents
-  const msdsDocs = [
-    { id: 'msds-001', product_id: 'prod-gpc-001', title: 'Ganga Multi-Purpose Cleaner MSDS', url: '/docs/msds/gpc-001-v1.pdf', ver: '1.0' },
-    { id: 'msds-002', product_id: 'prod-dsf-002', title: 'Ganga Hospital-Grade Disinfectant MSDS', url: '/docs/msds/dsf-002-v1.pdf', ver: '1.0' },
-    { id: 'msds-003', product_id: 'prod-hdd-010', title: 'Ganga Heavy Duty Degreaser MSDS', url: '/docs/msds/hdd-010-v1.pdf', ver: '1.0' }
-  ];
-  for (const d of msdsDocs) {
-    await run(
-      'INSERT INTO msds_documents (id, product_id, title, document_url, version) VALUES (?, ?, ?, ?, ?)',
-      [d.id, d.product_id, d.title, d.url, d.ver]
-    );
-  }
-  console.log('  ' + msdsDocs.length + ' MSDS documents seeded');
-
-  // ── Seed default user ─────────────────────────────────────────────────────
-  const users = await queryAll('SELECT COUNT(*) as count FROM users');
-  if (users.length === 0 || users[0].count === 0) {
-    const hashedPassword = await bcrypt.hash('pranav@123', 10);
-    await run(
-      `INSERT INTO users (uid, email, passwordHash, displayName, phone, age, gender, photoURL, provider, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      ['user_' + uuidv4(), 'pranavsubbareddy11@gmail.com', hashedPassword, 'Pranav', '', null, '', null, 'password', new Date().toISOString()]
-    );
-    console.log('  1 default user seeded: pranavsubbareddy11@gmail.com');
+  const existingUsers = await queryAll('SELECT COUNT(*) as count FROM users').catch(() => [{ count: 0 }]);
+  if (!existingUsers.length || existingUsers[0].count === 0) {
+    for (const u of portalUsers) {
+      const hashedPassword = await bcrypt.hash(u.pass, 10);
+      await run(
+        `INSERT INTO users (uid, email, passwordHash, displayName, role, phone, age, gender, photoURL, provider, emailVerified, createdAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
+        ['user_' + uuidv4(), u.email, hashedPassword, u.name, u.role, u.phone, null, '', null, 'password', new Date().toISOString()]
+      ).catch(e => console.log('    Skipped ' + u.email + ': ' + e.message));
+    }
+    console.log('  ' + portalUsers.length + ' portal users seeded with roles');
   } else {
     console.log('  Users table already has data — skipping user seed');
   }

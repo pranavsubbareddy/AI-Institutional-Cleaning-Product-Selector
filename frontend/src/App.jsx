@@ -12,6 +12,9 @@ import ProfilePage from './pages/ProfilePage';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import VerifyEmail from './pages/VerifyEmail';
+import AdminPortal from './pages/AdminPortal';
+import AdminDashboard from './pages/AdminDashboard';
+import UserRoleManagement from './pages/UserRoleManagement';
 import ProtectedRoute from './components/ProtectedRoute';
 import usePageTracking from './hooks/usePageTracking';
 
@@ -32,6 +35,9 @@ export default function App() {
           <Route path="detail/:id" element={<DetailPage />} />
           <Route path="edit/:id" element={<EditInstitution />} />
           <Route path="profile" element={<ProfilePage />} />
+          <Route path="admin-portal" element={<AdminPortal />} />
+          <Route path="admin" element={<AdminDashboard />} />
+          <Route path="admin/users" element={<UserRoleManagement />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Route>

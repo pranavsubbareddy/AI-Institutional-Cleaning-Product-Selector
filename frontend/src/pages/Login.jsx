@@ -3,14 +3,14 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 
+// Admin-level roles that should redirect to /admin-portal on login
+const ADMIN_LEVEL_ROLES = ['admin', 'sales_admin', 'warehouse_staff', 'salesman', 'accounts_manager', 'compliance_admin'];
+
 export default function Login() {
   const { signIn, signUp, googleSignIn } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const googleBtnRef = useRef(null);
-
-  // preserve redirect-to if coming from ProtectedRoute
-  const from = location.state?.from || '/dashboard';
 
   const [mode, setMode] = useState('login');
   const [email, setEmail] = useState('');
@@ -36,16 +36,17 @@ export default function Login() {
 
     try {
       if (mode === 'login') {
-        await signIn(email, password);
+        const userData = await signIn(email, password);
+        navigate(ADMIN_LEVEL_ROLES.includes(userData?.role) ? '/admin-portal' : '/dashboard', { replace: true });
       } else {
         if (!displayName.trim()) {
           setError('Display name is required');
           setSubmitting(false);
           return;
         }
-        await signUp(email, password, displayName.trim(), { phone: phone.trim(), age: age ? Number(age) : null, gender });
+        const userData = await signUp(email, password, displayName.trim(), { phone: phone.trim(), age: age ? Number(age) : null, gender });
+        navigate(ADMIN_LEVEL_ROLES.includes(userData?.role) ? '/admin-portal' : '/dashboard', { replace: true });
       }
-      navigate(from, { replace: true });
     } catch (err) {
       setError(err.message || 'Something went wrong');
     } finally {
@@ -134,8 +135,8 @@ export default function Login() {
       });
 
       // Send credential/auth code to backend
-      await googleSignIn(credential);
-      navigate(from, { replace: true });
+      const userData = await googleSignIn(credential);
+      navigate(ADMIN_LEVEL_ROLES.includes(userData?.role) ? '/admin-portal' : '/dashboard', { replace: true });
     } catch (err) {
       if (!err.message?.includes('cancelled') && !err.message?.includes('popup')) {
         setError(err.message || 'Google Sign-In failed');

@@ -80,24 +80,24 @@ describe("Desktop nav tabs", () => {
   test("visible on non-login page (2x: desktop tabs + mobile drawer)", () => {
     setAuthState({});
     render(<Navbar />);
-    expect(screen.getAllByText("Requirement Form").length).toBe(2);
-    expect(screen.getAllByText("B2B Dashboard").length).toBe(2);
+    expect(screen.getAllByText("Form").length).toBe(2);
+    expect(screen.getAllByText("Dashboard").length).toBe(2);
   });
 
   test("visible on /form page (2x: desktop tabs + mobile drawer)", () => {
     mockUseLocation.mockReturnValue({ pathname: "/form" });
     setAuthState({});
     render(<Navbar />);
-    expect(screen.getAllByText("Requirement Form").length).toBe(2);
-    expect(screen.getAllByText("B2B Dashboard").length).toBe(2);
+    expect(screen.getAllByText("Form").length).toBe(2);
+    expect(screen.getAllByText("Dashboard").length).toBe(2);
   });
 
   test("hidden on /login regardless of auth state", () => {
     mockUseLocation.mockReturnValue({ pathname: "/login" });
     setAuthState({ user: makeUser(), isAuthenticated: true });
     render(<Navbar />);
-    expect(screen.queryAllByText("Requirement Form").length).toBe(0);
-    expect(screen.queryAllByText("B2B Dashboard").length).toBe(0);
+    expect(screen.queryAllByText("Form").length).toBe(0);
+    expect(screen.queryAllByText("Dashboard").length).toBe(0);
   });
 });
 
@@ -167,12 +167,12 @@ describe("Mobile drawer content", () => {
     setAuthState({});
     render(<Navbar />);
     // Before opening: desktop + mobile drawer (closed but in DOM) = 2
-    expect(screen.getAllByText("Requirement Form").length).toBe(2);
-    expect(screen.getAllByText("B2B Dashboard").length).toBe(2);
+    expect(screen.getAllByText("Form").length).toBe(2);
+    expect(screen.getAllByText("Dashboard").length).toBe(2);
     fireEvent.click(screen.getByLabelText("Open menu"));
     // After opening: still 2 (mobile drawer was already in DOM, just revealed)
-    expect(screen.getAllByText("Requirement Form").length).toBe(2);
-    expect(screen.getAllByText("B2B Dashboard").length).toBe(2);
+    expect(screen.getAllByText("Form").length).toBe(2);
+    expect(screen.getAllByText("Dashboard").length).toBe(2);
   });
 
   test("drawer shows Home link (1 instance: mobile drawer only, desktop has SVG icon)", () => {
@@ -272,8 +272,8 @@ describe("Login page complete isolation", () => {
     setAuthState({});
     render(<Navbar />);
     expect(screen.getByText("Ganga Maxx")).toBeInTheDocument();
-    expect(screen.queryAllByText("Requirement Form").length).toBe(0);
-    expect(screen.queryAllByText("B2B Dashboard").length).toBe(0);
+    expect(screen.queryAllByText("Form").length).toBe(0);
+    expect(screen.queryAllByText("Dashboard").length).toBe(0);
     expect(screen.queryAllByText("Sign In").length).toBe(0);
     expect(screen.queryByLabelText("Open menu")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Close menu")).not.toBeInTheDocument();
@@ -284,8 +284,8 @@ describe("Login page complete isolation", () => {
     setAuthState({ user: makeUser(), isAuthenticated: true });
     render(<Navbar />);
     expect(screen.getByText("Ganga Maxx")).toBeInTheDocument();
-    expect(screen.queryAllByText("Requirement Form").length).toBe(0);
-    expect(screen.queryAllByText("B2B Dashboard").length).toBe(0);
+    expect(screen.queryAllByText("Form").length).toBe(0);
+    expect(screen.queryAllByText("Dashboard").length).toBe(0);
     expect(screen.queryAllByText("JD").length).toBe(0);
     expect(screen.queryByLabelText("Open menu")).not.toBeInTheDocument();
   });

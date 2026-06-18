@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 const { initializeSchema } = require('./database/schema');
+const { runAllChecks } = require('./services/reminderService');
 
 async function startServer() {
   const app = express();
@@ -26,6 +27,23 @@ async function startServer() {
   app.use('/api/institutions', require('./routes/institutions'));
   app.use('/api/recommendations', require('./routes/recommendations'));
   app.use('/api/dashboard', require('./routes/dashboard'));
+  app.use('/api/bulk-orders', require('./routes/bulkOrder'));
+  app.use('/api/warehouses', require('./routes/warehouse'));
+  app.use('/api/crm', require('./routes/crm'));
+  app.use('/api/quotations', require('./routes/quotation'));
+  app.use('/api/deliveries', require('./routes/delivery'));
+  app.use('/api/salesman', require('./routes/salesman'));
+  app.use('/api/reorder', require('./routes/reorder'));
+  app.use('/api/contract-pricing', require('./routes/contractPricing'));
+  app.use('/api/compliance', require('./routes/compliance'));
+  app.use('/api/notifications', require('./routes/notifications'));
+  app.use('/api/workflow', require('./routes/workflow'));
+
+  // Start automated reminder checks (every 10 minutes)
+  setInterval(() => {
+    runAllChecks().catch(err => console.error('[Scheduler] Reminder check error:', err.message));
+  }, 10 * 60 * 1000);
+  console.log('  Automated reminder scheduler started (interval: 10 min)');
 
   // Health check
   app.get('/api/health', (req, res) => {

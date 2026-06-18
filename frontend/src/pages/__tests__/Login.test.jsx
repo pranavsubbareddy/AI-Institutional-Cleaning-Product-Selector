@@ -68,7 +68,9 @@ describe("Mode switching", () => {
     setAuthState({});
     render(<Login />);
     expect(screen.getByText("Welcome Back")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /sign in/i })).toBeInTheDocument();
+    // Multiple buttons match /sign in/i (form submit + Google), so use getAllByRole
+    const signInBtns = screen.getAllByRole("button", { name: /sign in/i });
+    expect(signInBtns.length).toBeGreaterThanOrEqual(1);
   });
 
   test("switching to signup shows 'Create Account' heading", () => {

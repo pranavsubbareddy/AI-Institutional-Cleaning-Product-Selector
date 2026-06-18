@@ -21,7 +21,7 @@ const EFFECTIVE_SECRET = JWT_SECRET;
 
 function generateToken(user) {
   return jwt.sign(
-    { uid: user.uid, email: user.email, displayName: user.displayName },
+    { uid: user.uid, email: user.email, displayName: user.displayName, role: user.role || 'field_staff' },
     EFFECTIVE_SECRET,
     { expiresIn: '7d' }
   );
@@ -39,6 +39,8 @@ function requireAuth(req, res, next) {
 
   try {
     const decoded = jwt.verify(token, EFFECTIVE_SECRET);
+    // Ensure role defaults to field_staff if not present (legacy tokens)
+    if (!decoded.role) decoded.role = 'field_staff';
     req.user = decoded;
     next();
   } catch (err) {

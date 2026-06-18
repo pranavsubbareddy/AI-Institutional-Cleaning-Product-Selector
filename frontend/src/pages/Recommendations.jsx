@@ -1,46 +1,24 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, Link, useLocation } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { api, formatCurrency } from '../services/api';
 import ProductCard from '../components/ProductCard';
 import LoadingState from '../components/LoadingState';
 import ErrorState from '../components/ErrorState';
-import html2pdf from 'html2pdf.js';
 import { sendReportToEmail, isEmailJSConfigured } from '../services/emailService';
+import html2pdf from 'html2pdf.js';
 
 export default function Recommendations() {
   const { id } = useParams();
-  const location = useLocation();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [copiedProductId, setCopiedProductId] = useState(null);
   const [downloading, setDownloading] = useState(false);
-  const [sendingEmail, setSendingEmail] = useState(false);
-  const [showEmailModal, setShowEmailModal] = useState(false);
-  const [emailAddress, setEmailAddress] = useState('');
   const [toast, setToast] = useState(null);
-  const emailProcessedRef = useRef(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailTo, setEmailTo] = useState('');
+  const [emailSending, setEmailSending] = useState(false);
   const contentRef = useRef(null);
-
-  // Handle email result from location state (passed from RequirementForm)
-  useEffect(() => {
-    const emailResult = location.state?.emailResult;
-    if (!emailResult || emailProcessedRef.current) return;
-    emailProcessedRef.current = true;
-
-    if (emailResult.skipped) return;
-
-    if (emailResult.success) {
-      setToast({ type: 'success', message: 'Confirmation email sent successfully to your inbox!' });
-    } else if (emailResult.timedOut) {
-      setToast({ type: 'warning', message: 'Email is being sent in the background. Check your inbox shortly.' });
-    } else {
-      setToast({ type: 'error', message: `Failed to send email: ${emailResult.error}` });
-    }
-
-    const timer = setTimeout(() => setToast(null), 6000);
-    return () => clearTimeout(timer);
-  }, [location.state]);
 
   const dismissToast = useCallback(() => {
     setToast(null);
@@ -148,34 +126,35 @@ export default function Recommendations() {
     }
   };
 
+
   const handleSendEmail = async () => {
-    if (!emailAddress || !emailAddress.includes('@') || sendingEmail) return;
-    setSendingEmail(true);
+    if (!emailTo || emailSending || !data) return;
+    setEmailSending(true);
+
     try {
-      const result = await sendReportToEmail(
-        emailAddress,
-        data.institution_name || 'Valued Customer',
-        {
-          items: data.items,
-          total_estimated_cost: data.total_estimated_cost,
-          summary: data.summary,
-          alerts: data.alerts || [],
-          institution_name: data.institution_name,
-          institution_type: data.institution_type
-        }
-      );
+      const reportData = {
+        ...data,
+        institution_name: data.institution_name,
+        total_estimated_cost: data.total_estimated_cost,
+        items: data.items,
+        summary: data.summary,
+        alerts: data.alerts,
+      };
+
+      const result = await sendReportToEmail(emailTo, data.institution_name || 'Valued Customer', reportData);
+
       if (result.success) {
-        setToast({ type: 'success', message: 'Quotation emailed successfully to ' + emailAddress });
+        setToast({ type: 'success', message: `Report sent successfully to ${emailTo}` });
         setShowEmailModal(false);
-        setEmailAddress('');
+        setEmailTo('');
       } else {
-        setToast({ type: 'error', message: 'Failed to send email: ' + (result.error || 'Unknown error') });
+        setToast({ type: 'error', message: result.error || 'Failed to send email. Please try again.' });
       }
     } catch (err) {
-      setToast({ type: 'error', message: 'Failed to send email: ' + (err.message || 'Unknown error') });
+      setToast({ type: 'error', message: err.message || 'Failed to send email. Please try again.' });
     } finally {
-      setSendingEmail(false);
-      setTimeout(() => setToast(null), 6000);
+      setEmailSending(false);
+      setTimeout(() => setToast(null), 5000);
     }
   };
 
@@ -228,7 +207,7 @@ export default function Recommendations() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium">
-                {toast.type === 'success' ? 'Email Sent' : toast.type === 'warning' ? 'Sending Email' : 'Email Failed'}
+                {toast.type === 'success' ? 'Success' : toast.type === 'warning' ? 'Warning' : 'Error'}
               </p>
               <p className="text-xs mt-1 opacity-80">{toast.message}</p>
             </div>
@@ -252,12 +231,7 @@ export default function Recommendations() {
             <p className="text-surface-400 mt-1">For <span className="text-surface-200 font-medium">{data.institution_name}</span></p>
           </div>
           <div className="flex gap-2 flex-wrap">
-            <button onClick={() => setShowEmailModal(true)} className="btn-accent text-sm">
-              <svg className="w-4 h-4 inline mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
-              Email Report
-            </button>
+
             <button onClick={handleDownloadPDF} disabled={downloading} className="btn-primary text-sm">
               <svg className="w-4 h-4 inline mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={downloading ? 'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15' : 'M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'} />
@@ -270,86 +244,17 @@ export default function Recommendations() {
               </svg>
               {copiedProductId === 'all' ? 'Copied!' : 'Copy Quotation'}
             </button>
+            <button onClick={() => { setEmailTo(data?.contact_email || ''); setShowEmailModal(true); }} className="btn-secondary text-sm">
+              <svg className="w-4 h-4 inline mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              Send Email
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Email Modal Dialog - OUTSIDE contentRef */}
-      {showEmailModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowEmailModal(false)} onKeyDown={e => { if (e.key === 'Escape') setShowEmailModal(false); }} tabIndex={-1}>
-          <div className="absolute inset-0 bg-surface-900/80 backdrop-blur-sm" />
-          <div className="relative bg-surface-800 border border-surface-700 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-fade-in" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="text-lg font-semibold text-surface-100">Email Quotation</h3>
-              <button onClick={() => setShowEmailModal(false)} className="p-1.5 rounded-lg hover:bg-surface-700 transition-colors">
-                <svg className="w-5 h-5 text-surface-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
 
-            {!isEmailJSConfigured() ? (
-              <div className="space-y-4">
-                <div className="p-4 bg-surface-700/30 rounded-xl border border-surface-600/50">
-                  <p className="text-sm text-surface-400">
-                    Email reporting is not available at the moment.
-                  </p>
-                </div>
-                <div className="flex justify-end">
-                  <button onClick={() => setShowEmailModal(false)} className="btn-secondary text-sm">
-                    Close
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <p className="text-sm text-surface-400">
-                  Send the full quotation with product recommendations and cost summary to:
-                </p>
-                <div>
-                  <label className="block text-xs font-medium text-surface-400 mb-1.5">Email Address</label>
-                  <input
-                    type="email"
-                    value={emailAddress}
-                    onChange={e => setEmailAddress(e.target.value)}
-                    placeholder="recipient@example.com"
-                    autoFocus
-                    className="w-full px-4 py-2.5 bg-surface-700 border border-surface-600 rounded-xl text-surface-100 placeholder-surface-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 transition-colors text-sm"
-                    onKeyDown={e => { if (e.key === 'Enter' && emailAddress.includes('@') && !sendingEmail) handleSendEmail(); }}
-                  />
-                </div>
-                <div className="flex gap-3 justify-end">
-                  <button onClick={() => setShowEmailModal(false)} className="btn-secondary text-sm">
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSendEmail}
-                    disabled={!emailAddress.includes('@') || sendingEmail}
-                    className="btn-accent text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {sendingEmail ? (
-                      <>
-                        <svg className="animate-spin w-4 h-4 inline mr-1.5" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
-                        Sending...
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-4 h-4 inline mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                        </svg>
-                        Send Email
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Report content wrapped for PDF capture - no nav/buttons here */}
       <div className="animate-fade-in" ref={contentRef}>
@@ -509,6 +414,8 @@ export default function Recommendations() {
         </div>
       )}
 
+
+
       {/* Alerts */}
       {data.alerts?.length > 0 && (
         <div className="mb-6 space-y-2">
@@ -640,8 +547,86 @@ export default function Recommendations() {
               </div>
             </div>
           </div>
-        )}
-      </div>
+        )}      </div>
+
+      {/* ── Send Email Modal ────────────────────────────────────── */}
+      {showEmailModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => { if (!emailSending) setShowEmailModal(false); }}>
+          <div className="absolute inset-0 bg-surface-900/80 backdrop-blur-sm" />
+          <div className="relative bg-surface-800 border border-surface-700 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-fade-in" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-surface-100">Send Report via Email</h3>
+                <p className="text-sm text-surface-400">Send this quotation to the facility contact</p>
+              </div>
+            </div>
+
+            {!isEmailJSConfigured() ? (
+              <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 mb-4">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-amber-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <p className="text-sm text-amber-300">Email service is not configured. Please set your EmailJS API keys in the environment variables to enable email sending.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-surface-400 mb-1.5">Recipient Email Address</label>
+                  <input
+                    type="email"
+                    value={emailTo}
+                    onChange={e => setEmailTo(e.target.value)}
+                    placeholder="email@example.com"
+                    autoFocus
+                    disabled={emailSending}
+                    className="w-full px-4 py-2.5 bg-surface-700 border border-surface-600 rounded-xl text-surface-100 placeholder-surface-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 transition-colors text-sm disabled:opacity-50"
+                    onKeyDown={e => { if (e.key === 'Enter' && emailTo && !emailSending) { e.preventDefault(); handleSendEmail(); } }}
+                  />
+                </div>
+
+                <div className="flex gap-3 justify-end pt-2">
+                  <button
+                    onClick={() => { setShowEmailModal(false); setEmailTo(''); }}
+                    disabled={emailSending}
+                    className="px-5 py-2.5 rounded-xl border border-surface-600 text-surface-300 hover:bg-surface-700/50 transition-all text-sm font-medium disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSendEmail}
+                    disabled={!emailTo || emailSending}
+                    className="px-5 py-2.5 rounded-xl bg-cyan-600 text-white font-medium hover:bg-cyan-500 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-cyan-600/20 flex items-center gap-2"
+                  >
+                    {emailSending ? (
+                      <>
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                        </svg>
+                        Send Report
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
     </>
   );

@@ -1,5 +1,6 @@
 const http = require('http');
 const axios = require('axios');
+const { generateToken } = require('../../middleware/auth');
 
 jest.setTimeout(30000); // Integration tests can be slow with HTTP + server startup
 
@@ -69,8 +70,18 @@ function makeInstitutionBody(overrides = {}) {
 describe('/api/recommendations/process — Integration', () => {
   let server;
   let baseURL;
+  let testToken;
+  let api;
 
   beforeAll(async () => {
+    // Generate a test JWT token for authenticated requests
+    testToken = generateToken({
+      uid: 'test-integration-user',
+      email: 'test-integration@test.com',
+      displayName: 'Test Integration User',
+      role: 'field_staff'
+    });
+
     // Re-import the app fresh for each test suite
     delete require.cache[require.resolve('../../../server')];
     const app = require('../../../server');
@@ -78,6 +89,12 @@ describe('/api/recommendations/process — Integration', () => {
     await new Promise(resolve => server.listen(0, resolve));
     const port = server.address().port;
     baseURL = `http://localhost:${port}/api`;
+
+    // Create authenticated axios instance with the JWT token as a cookie
+    api = axios.create({
+      baseURL,
+      headers: { Cookie: `token=${testToken}` }
+    });
   });
 
   afterAll(async () => {
@@ -86,18 +103,18 @@ describe('/api/recommendations/process — Integration', () => {
 
   // Helper to create an institution and return its ID
   async function createInstitution(body) {
-    const res = await axios.post(`${baseURL}/institutions`, body);
+    const res = await api.post('/institutions', body);
     return res.data.data.id;
   }
 
   // Helper to process a recommendation
   async function processRecommendation(institutionId) {
-    return axios.post(`${baseURL}/recommendations/process`, { institutionId });
+    return api.post('/recommendations/process', { institutionId });
   }
 
   // Helper to get a recommendation by ID
   async function getRecommendation(id) {
-    return axios.get(`${baseURL}/recommendations/${id}`);
+    return api.get(`/recommendations/${id}`);
   }
 
   // ──────────────────────────────────────────────────────────────────────
@@ -106,7 +123,7 @@ describe('/api/recommendations/process — Integration', () => {
   describe('Input validation', () => {
     test('returns 400 when institutionId is missing', async () => {
       try {
-        await axios.post(`${baseURL}/recommendations/process`, {});
+        await api.post('/recommendations/process', {});
         fail('Expected 400 error');
       } catch (err) {
         expect(err.response.status).toBe(400);
@@ -116,7 +133,7 @@ describe('/api/recommendations/process — Integration', () => {
 
     test('returns 400 when institutionId is null', async () => {
       try {
-        await axios.post(`${baseURL}/recommendations/process`, { institutionId: null });
+        await api.post('/recommendations/process', { institutionId: null });
         fail('Expected 400 error');
       } catch (err) {
         expect(err.response.status).toBe(400);
@@ -126,7 +143,7 @@ describe('/api/recommendations/process — Integration', () => {
 
     test('returns 404 when institutionId does not exist', async () => {
       try {
-        await axios.post(`${baseURL}/recommendations/process`, { institutionId: 'non-existent-id' });
+        await api.post('/recommendations/process', { institutionId: 'non-existent-id' });
         fail('Expected 404 error');
       } catch (err) {
         expect(err.response.status).toBe(404);
@@ -136,7 +153,7 @@ describe('/api/recommendations/process — Integration', () => {
 
     test('returns 400 with empty request body', async () => {
       try {
-        await axios.post(`${baseURL}/recommendations/process`, {}, { headers: { 'Content-Type': 'application/json' } });
+        await api.post('/recommendations/process', {}, { headers: { 'Content-Type': 'application/json' } });
         fail('Expected 400 error');
       } catch (err) {
         expect(err.response.status).toBe(400);
@@ -263,7 +280,7 @@ describe('/api/recommendations/process — Integration', () => {
     });
 
     test('GET /api/recommendations lists the processed recommendation', async () => {
-      const res = await axios.get(`${baseURL}/recommendations`);
+      const res = await api.get('/recommendations');
       expect(res.status).toBe(200);
       expect(res.data.success).toBe(true);
       expect(res.data.count).toBeGreaterThanOrEqual(1);
@@ -273,7 +290,7 @@ describe('/api/recommendations/process — Integration', () => {
     });
 
     test('institution GET includes recommendations in response', async () => {
-      const res = await axios.get(`${baseURL}/institutions/${institutionId}`);
+      const res = await api.get(`/institutions/${institutionId}`);
       expect(res.status).toBe(200);
       expect(Array.isArray(res.data.data.recommendations)).toBe(true);
       expect(res.data.data.recommendations.length).toBeGreaterThanOrEqual(1);
@@ -427,7 +444,7 @@ describe('/api/recommendations/process — Integration', () => {
   describe('Error handling', () => {
     test('returns 404 for unknown route', async () => {
       try {
-        await axios.get(`${baseURL}/nonexistent`);
+        await api.get('/nonexistent');
         fail('Expected 404 error');
       } catch (err) {
         expect(err.response.status).toBe(404);
@@ -437,7 +454,7 @@ describe('/api/recommendations/process — Integration', () => {
 
     test('returns 404 for unknown recommendation ID', async () => {
       try {
-        await axios.get(`${baseURL}/recommendations/does-not-exist`);
+        await api.get('/recommendations/does-not-exist');
         fail('Expected 404 error');
       } catch (err) {
         expect(err.response.status).toBe(404);
@@ -468,7 +485,7 @@ describe('/api/recommendations/process — Integration', () => {
       await processRecommendation(id);
       await processRecommendation(id);
 
-      const res = await axios.get(`${baseURL}/recommendations`, {
+      const res = await api.get('/recommendations', {
         params: { limit: 50 }
       });
       const multiRecs = res.data.data.filter(r => r.institution_name === 'MultiRec Institution');

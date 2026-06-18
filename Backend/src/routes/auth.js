@@ -105,7 +105,73 @@ router.post('/login', async (req, res, next) => {
       return res.status(400).json({ success: false, error: 'Email and password are required', timestamp: new Date().toISOString() });
     }
 
-    const record = await queryOne('SELECT * FROM users WHERE email = ?', [email.toLowerCase().trim()]).catch(() => null);
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // ── Portal seed users (fallback for when DB is unavailable) ────────
+    const SEED_USERS = [
+      { email: 'manager@ganga-maxx.com', pass: 'manager@123', name: 'Facility Manager', role: 'field_staff' },
+      { email: 'dealer@ganga-maxx.com', pass: 'dealer@123', name: 'Dealer Distributor', role: 'dealer' },
+      { email: 'salesman@ganga-maxx.com', pass: 'salesman@123', name: 'Field Sales Agent', role: 'salesman' },
+      { email: 'warehouse@ganga-maxx.com', pass: 'warehouse@123', name: 'Warehouse Manager', role: 'warehouse_staff' },
+      { email: 'accounts@ganga-maxx.com', pass: 'accounts@123', name: 'Accounts Manager', role: 'accounts_manager' },
+      { email: 'compliance@ganga-maxx.com', pass: 'compliance@123', name: 'Compliance Officer', role: 'compliance_admin' },
+      { email: 'salesadmin@ganga-maxx.com', pass: 'salesadmin@123', name: 'Sales Administrator', role: 'sales_admin' },
+    ];
+
+    // ── Hardcoded admin login check (credentials from .env) ────────────
+    const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || '').toLowerCase().trim();
+    const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
+
+    if (normalizedEmail === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+      const adminUser = {
+        uid: 'admin',
+        email: ADMIN_EMAIL,
+        displayName: 'Administrator',
+        role: 'admin',
+        phone: '',
+        photoURL: null,
+        provider: 'admin',
+        emailVerified: true,
+        createdAt: new Date().toISOString()
+      };
+
+      const token = generateToken(adminUser);
+      res.cookie('token', token, COOKIE_OPTIONS);
+
+      return res.json({
+        success: true, message: 'Logged in as Administrator',
+        data: { ...adminUser, emailVerified: true },
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // ── Check seed portal users (works even without DB) ────────────────
+    const seedMatch = SEED_USERS.find(u => u.email === normalizedEmail && u.pass === password);
+    if (seedMatch) {
+      const portalUser = {
+        uid: 'user_' + seedMatch.role,
+        email: seedMatch.email,
+        displayName: seedMatch.name,
+        role: seedMatch.role,
+        phone: '',
+        photoURL: null,
+        provider: 'seed',
+        emailVerified: true,
+        createdAt: new Date().toISOString()
+      };
+
+      const token = generateToken(portalUser);
+      res.cookie('token', token, COOKIE_OPTIONS);
+
+      return res.json({
+        success: true, message: 'Logged in as ' + portalUser.displayName,
+        data: { ...portalUser, emailVerified: true },
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // ── Normal user login (database) ───────────────────────────────────
+    const record = await queryOne('SELECT * FROM users WHERE email = ?', [normalizedEmail]).catch(() => null);
     if (!record) {
       return res.status(401).json({ success: false, error: 'Invalid email or password', timestamp: new Date().toISOString() });
     }
@@ -150,6 +216,47 @@ router.get('/me', async (req, res) => {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
+
+    // ── Admin user (hardcoded, not in DB) ──────────────────────────
+    if (decoded.uid === 'admin' && decoded.role === 'admin') {
+      return res.json({
+        success: true, authenticated: true,
+        data: {
+          uid: 'admin',
+          email: decoded.email,
+          displayName: 'Administrator',
+          role: 'admin',
+          phone: '',
+          photoURL: null,
+          provider: 'admin',
+          emailVerified: true,
+          createdAt: new Date().toISOString()
+        },
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // ── Check seed portal users (persist login without DB) ────────
+    const SEED_IDS = ['user_field_staff', 'user_dealer', 'user_salesman', 'user_warehouse_staff', 'user_accounts_manager', 'user_compliance_admin', 'user_sales_admin'];
+    if (SEED_IDS.includes(decoded.uid)) {
+      return res.json({
+        success: true, authenticated: true,
+        data: {
+          uid: decoded.uid,
+          email: decoded.email,
+          displayName: decoded.displayName,
+          role: decoded.role,
+          phone: decoded.phone || '',
+          photoURL: decoded.photoURL || null,
+          provider: 'seed',
+          emailVerified: true,
+          createdAt: decoded.createdAt || new Date().toISOString()
+        },
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // ── Normal user (database) ─────────────────────────────────────
     const record = await queryOne('SELECT * FROM users WHERE uid = ?', [decoded.uid]).catch(() => null);
     if (!record) {
       res.clearCookie('token', { path: '/' });

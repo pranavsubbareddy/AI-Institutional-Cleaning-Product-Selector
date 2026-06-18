@@ -30,6 +30,11 @@ function validateInstitutionInput(req, res, next) {
     errors.push(`Budget must be one of: ${validBudgets.join(', ')}`);
   }
 
+  const validTypes = ['hospital', 'school', 'hotel', 'office', 'restaurant', 'factory', 'warehouse', 'retail', 'gym', 'laboratory', 'pharmacy', 'airport', 'shopping_mall', 'cinema', 'library', 'community_center'];
+  if (!institution_type || typeof institution_type !== 'string' || !validTypes.includes(institution_type)) {
+    errors.push(`Institution type must be one of: ${validTypes.join(', ')}`);
+  }
+
   if (errors.length > 0) {
     return res.status(400).json({
       success: false,

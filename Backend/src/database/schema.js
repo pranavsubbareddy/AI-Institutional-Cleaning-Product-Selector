@@ -567,6 +567,13 @@ async function initializeSchema() {
     }
   }
 
+  // Add role column for existing databases (safe if already exists)
+  try {
+    await pool.execute("ALTER TABLE users ADD COLUMN role VARCHAR(20) DEFAULT 'field_staff' AFTER uid");
+  } catch (e) {
+    // Column already exists - ignore
+  }
+
   // Add user_id column for existing databases (safe if already exists)
   try {
     await pool.execute('ALTER TABLE institutions ADD COLUMN user_id VARCHAR(50) DEFAULT NULL AFTER status');
@@ -591,6 +598,49 @@ async function initializeSchema() {
   } catch (e) {
     // Column already wide enough
   }
+
+  // ── Workflow Events table (audit trail) ───────────────────────────────
+  await pool.execute(`CREATE TABLE IF NOT EXISTS workflow_events (
+    id VARCHAR(36) PRIMARY KEY,
+    order_id VARCHAR(36) NOT NULL,
+    from_stage VARCHAR(50),
+    to_stage VARCHAR(50) NOT NULL,
+    action VARCHAR(100) NOT NULL,
+    performed_by VARCHAR(255) NOT NULL DEFAULT 'system',
+    notes TEXT,
+    metadata TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  // Add workflow stage columns to orders (safe if already exist)
+  try {
+    await pool.execute("ALTER TABLE orders ADD COLUMN workflow_stage VARCHAR(50) DEFAULT 'request_created' AFTER status");
+  } catch (e) {}
+  try {
+    await pool.execute("ALTER TABLE orders ADD COLUMN payment_status VARCHAR(20) DEFAULT 'pending' AFTER workflow_stage");
+  } catch (e) {}
+  try {
+    await pool.execute('ALTER TABLE orders ADD COLUMN paid_amount DECIMAL(12,2) DEFAULT 0 AFTER payment_status');
+  } catch (e) {}
+  try {
+    await pool.execute("ALTER TABLE orders ADD COLUMN sales_approval_status VARCHAR(20) DEFAULT 'pending' AFTER paid_amount");
+  } catch (e) {}
+  try {
+    await pool.execute('ALTER TABLE orders ADD COLUMN sales_approved_by VARCHAR(255) AFTER sales_approval_status');
+  } catch (e) {}
+  try {
+    await pool.execute("ALTER TABLE orders ADD COLUMN compliance_status VARCHAR(20) DEFAULT 'pending' AFTER sales_approved_by");
+  } catch (e) {}
+  try {
+    await pool.execute('ALTER TABLE orders ADD COLUMN compliance_notes TEXT AFTER compliance_status');
+  } catch (e) {}
+  try {
+    await pool.execute('ALTER TABLE orders ADD COLUMN quotation_id VARCHAR(36) AFTER recommendation_id');
+  } catch (e) {}
+  try {
+    await pool.execute('ALTER TABLE orders ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at');
+  } catch (e) {}
 
   console.log(' Database schema initialized');
   return pool;

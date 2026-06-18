@@ -1,14 +1,19 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api, formatCurrency } from '../services/api';
 import LoadingState from '../components/LoadingState';
 import ErrorState from '../components/ErrorState';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 export default function DetailPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [confirmDialog, setConfirmDialog] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   useEffect(() => {
     fetchDetail();
@@ -44,15 +49,57 @@ export default function DetailPage() {
             <h1 className="text-2xl font-bold text-surface-100">{data.name}</h1>
             <p className="text-surface-400 mt-1">Facility Details &amp; History</p>
           </div>
-          <Link to={`/edit/${data.id}`}
-            className="btn-secondary flex-shrink-0 text-sm mt-6">
-            <svg className="w-4 h-4 inline mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          <button onClick={() => setConfirmDialog({ id: data.id, name: data.name, data })}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 text-sm font-medium transition-all flex-shrink-0"
+            title="Delete facility">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
-            Edit Facility
-          </Link>
+            Delete
+          </button>
         </div>
       </div>
+
+      {/* Delete Error Alert */}
+      {deleteError && (
+        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start gap-3 animate-fade-in">
+          <svg className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <div className="flex-1">
+            <p className="text-sm text-red-300">{deleteError}</p>
+          </div>
+          <button onClick={() => setDeleteError('')} className="p-1 rounded-lg hover:bg-red-500/10 transition-colors">
+            <svg className="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        open={!!confirmDialog}
+        title="Delete Facility"
+        message={'Are you sure you want to delete "' + (confirmDialog?.name || '') + '"? This will permanently remove the facility and all its data.'}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="danger"
+        isLoading={isDeleting}
+        onConfirm={async () => {
+          if (!confirmDialog) return;
+          setIsDeleting(true);
+          try {
+            await api.deleteInstitution(confirmDialog.id);
+            navigate('/dashboard', { replace: true });
+          } catch (err) {
+            setDeleteError(err.message || 'Failed to delete facility');
+            setConfirmDialog(null);
+            setIsDeleting(false);
+          }
+        }}
+        onCancel={() => { setConfirmDialog(null); }}
+      />
 
       {/* Institution Details Card */}
       <div className="card p-6 mb-6">

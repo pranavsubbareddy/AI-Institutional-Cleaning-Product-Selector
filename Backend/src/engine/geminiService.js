@@ -1,5 +1,4 @@
 const { ChatOpenAI } = require('@langchain/openai');
-const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
 const { z } = require('zod');
 
 // ── Zod schema for structured output ──────────────────────────────────
@@ -17,7 +16,7 @@ const RecommendationSchema = z.object({
         safety_notes: z.string().describe('Safety precautions'),
       })
     )
-    .describe('Array of recommended products — recommend 4-8 most relevant products'),
+    .describe('Array of recommended products — recommend the right number of products (typically 4-10 depending on facility complexity and needs)'),
   summary: z.object({
     grossAggregatedCost: z.number().describe('Total monthly cost of all recommended products in INR'),
     financialStatusAlert: z.string().nullable().describe('Budget/financial alert message or null'),
@@ -25,14 +24,8 @@ const RecommendationSchema = z.object({
 });
 
 // ── Key validation ────────────────────────────────────────────────────
-function isValidOpenAIKey(apiKey) {
-  return typeof apiKey === 'string' && apiKey.trim().startsWith('sk-');
-}
-
-function isValidGeminiKey(apiKey) {
-  if (typeof apiKey !== 'string') return false;
-  const key = apiKey.trim();
-  return key.length > 20 && !key.startsWith('sk-') && !key.includes('your_');
+function isValidGroqKey(apiKey) {
+  return typeof apiKey === 'string' && apiKey.trim().startsWith('gsk_');
 }
 
 function splitKeyList(value) {
@@ -44,43 +37,18 @@ function splitKeyList(value) {
 }
 
 // ── Key discovery ─────────────────────────────────────────────────────
-function getOpenAIKeyCandidates() {
+function getGroqKeyCandidates() {
   const keys = [
-    ...splitKeyList(process.env.OPENAI_API_KEYS),
-    ...splitKeyList(process.env.OPENAI_API_KEY),
-    ...splitKeyList(process.env.OPENAI_KEY),
+    ...splitKeyList(process.env.GROQ_API_KEYS),
+    ...splitKeyList(process.env.GROQ_API_KEY),
   ];
 
   Object.keys(process.env)
-    .filter(name => /^OPENAI_(?:API_)?KEY_\d+$/i.test(name))
+    .filter(name => /^GROQ_(?:API_)?KEY_\d+$/i.test(name))
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
     .forEach(name => keys.push(...splitKeyList(process.env[name])));
 
-  // Accept Gemini env names only when the value is clearly an OpenAI key
-  [
-    process.env.GEMINI_API_KEY,
-    process.env.GEMINI_API_KEYS,
-    process.env.GOOGLE_API_KEY,
-    process.env.GOOGLE_AI_API_KEY,
-  ].forEach(value => keys.push(...splitKeyList(value)));
-
-  return [...new Set(keys.filter(isValidOpenAIKey))];
-}
-
-function getGeminiKeyCandidates() {
-  const keys = [
-    ...splitKeyList(process.env.GEMINI_API_KEYS),
-    ...splitKeyList(process.env.GEMINI_API_KEY),
-    ...splitKeyList(process.env.GOOGLE_API_KEY),
-    ...splitKeyList(process.env.GOOGLE_AI_API_KEY),
-  ];
-
-  Object.keys(process.env)
-    .filter(name => /^(?:GEMINI|GOOGLE(?:_AI)?)_(?:API_)?KEY_\d+$/i.test(name))
-    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
-    .forEach(name => keys.push(...splitKeyList(process.env[name])));
-
-  return [...new Set(keys.filter(isValidGeminiKey))];
+  return [...new Set(keys.filter(isValidGroqKey))];
 }
 
 // ── Model cache ───────────────────────────────────────────────────────
@@ -91,29 +59,21 @@ function getStructuredModel(key, provider) {
   if (modelCache.has(cacheKey)) return modelCache.get(cacheKey);
 
   let model;
-  if (provider === 'openai') {
+  if (provider === 'groq') {
     const chatModel = new ChatOpenAI({
       apiKey: key,
-      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+      model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
       temperature: 0.3,
-      maxTokens: 1536,
-      timeout: 7000,
+      maxTokens: 3000,
+      timeout: 10000,
       maxRetries: 0,
+      configuration: {
+        baseURL: "https://api.groq.com/openai/v1"
+      }
     });
     model = chatModel.withStructuredOutput(RecommendationSchema, {
       name: 'recommendation',
-    });
-  } else {
-    const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
-    const chatModel = new ChatGoogleGenerativeAI({
-      apiKey: key,
-      model: geminiModel,
-      temperature: 0.2,
-      maxOutputTokens: 2048,
-      timeout: 7000,
-    });
-    model = chatModel.withStructuredOutput(RecommendationSchema, {
-      name: 'recommendation',
+      method: 'jsonMode',
     });
   }
 
@@ -122,88 +82,49 @@ function getStructuredModel(key, provider) {
 }
 
 /**
- * Generate recommendations using LangChain (OpenAI or Gemini).
+ * Generate recommendations using LangChain (Groq).
  * Returns null if no API key is configured or all providers fail.
  * @param {Object} params - { institution_type, area_size, surface_types, hygiene_standard, budget, metadata }
  * @returns {Object|null} { recommendations: [...], summary: {...} } or null
  */
 async function generateRecommendations(params) {
-  const apiKeys = getOpenAIKeyCandidates();
-  const geminiKeys = getGeminiKeyCandidates();
+  const groqKeys = getGroqKeyCandidates();
 
-  if (apiKeys.length === 0 && geminiKeys.length === 0) {
-    console.log('  No valid OpenAI or Gemini API key found. Returning null — AI-only recommendation route will return 503.');
+  if (groqKeys.length === 0) {
+    console.log('  No valid Groq API key found. Returning null — AI-only recommendation route will return 503.');
     return null;
   }
 
   const catalog = getCatalogForPrompt();
   const prompt = buildPrompt(params, catalog);
 
-  // Try OpenAI keys first
-  if (apiKeys.length > 0) {
-    console.log(`  Using LangChain OpenAI with ${apiKeys.length} configured key(s)...`);
-    console.log('  OpenAI model:', process.env.OPENAI_MODEL || 'gpt-4o-mini');
+  console.log(`  Using LangChain Groq with ${groqKeys.length} configured key(s)...`);
+  console.log('  Groq model:', process.env.GROQ_MODEL || 'llama-3.3-70b-versatile');
 
-    for (let index = 0; index < apiKeys.length; index += 1) {
-      try {
-        console.log(`  Trying OpenAI API key ${index + 1}/${apiKeys.length}...`);
-        const structuredModel = getStructuredModel(apiKeys[index], 'openai');
-        const result = await Promise.race([
-          structuredModel.invoke(prompt),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 9000))
-        ]);
+  for (let index = 0; index < groqKeys.length; index += 1) {
+    try {
+      console.log(`  Trying Groq API key ${index + 1}/${groqKeys.length}...`);
+      const structuredModel = getStructuredModel(groqKeys[index], 'groq');
+      const result = await Promise.race([
+        structuredModel.invoke(prompt),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 30000))
+      ]);
 
-        if (result && result.recommendations && result.recommendations.length > 0 && result.summary) {
-          console.log('  OpenAI success —', result.recommendations.length, 'products recommended');
-          return result;
-        }
-
-        console.warn('  OpenAI returned invalid/malformed response.');
-      } catch (error) {
-        if (error.message === 'TIMEOUT') {
-          console.warn(`  ⛔ TIMEOUT on OpenAI key ${index + 1}/${apiKeys.length}. Moving to next key...`);
-        } else {
-          const status = error.status || error.code || 'unknown';
-          if (status === 429) {
-            console.warn(`  ⛔ RATE LIMIT on OpenAI key ${index + 1}/${apiKeys.length}. Rotating to next key...`);
-          } else {
-            console.warn(`  OpenAI key ${index + 1}/${apiKeys.length} failed (${status}):`, error.message);
-          }
-        }
+      if (result && result.recommendations && result.recommendations.length > 0 && result.summary) {
+        console.log('  Groq success —', result.recommendations.length, 'products recommended');
+        return result;
       }
-    }
-  }
 
-  // Fallback to Gemini keys
-  if (geminiKeys.length > 0) {
-    console.log(`  Using LangChain Gemini with ${geminiKeys.length} configured key(s)...`);
-    console.log('  Gemini model:', process.env.GEMINI_MODEL || 'gemini-2.0-flash');
-
-    for (let index = 0; index < geminiKeys.length; index += 1) {
-      try {
-        console.log(`  Trying Gemini API key ${index + 1}/${geminiKeys.length}...`);
-        const structuredModel = getStructuredModel(geminiKeys[index], 'gemini');
-        const result = await Promise.race([
-          structuredModel.invoke(prompt),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 9000))
-        ]);
-
-        if (result && result.recommendations && result.recommendations.length > 0 && result.summary) {
-          console.log('  Gemini success —', result.recommendations.length, 'products recommended');
-          return result;
-        }
-
-        console.warn('  Gemini returned invalid/malformed response.');
-      } catch (error) {
-        if (error.message === 'TIMEOUT') {
-          console.warn(`  ⛔ TIMEOUT on Gemini key ${index + 1}/${geminiKeys.length}. Moving to next key...`);
+      console.warn('  Groq returned invalid/malformed response.');
+    } catch (error) {
+      if (error.message === 'TIMEOUT') {
+        console.warn(`  ⛔ TIMEOUT on Groq key ${index + 1}/${groqKeys.length}. Moving to next key...`);
+      } else {
+        const status = error.status || error.code || 'unknown';
+        if (status === 429) {
+          console.warn(`  ⛔ RATE LIMIT on Groq key ${index + 1}/${groqKeys.length}. Rotating to next key...`);
         } else {
-          const status = error.status || error.code || 'unknown';
-          if (status === 429) {
-            console.warn(`  ⛔ RATE LIMIT on Gemini key ${index + 1}/${geminiKeys.length}. Rotating to next key...`);
-          } else {
-            console.warn(`  Gemini key ${index + 1}/${geminiKeys.length} failed (${status}):`, error.message);
-          }
+          console.warn(`  Groq key ${index + 1}/${groqKeys.length} failed (${status}):`, error.message);
         }
       }
     }
@@ -322,16 +243,36 @@ function buildPrompt(params, catalog) {
   const hygiene = params.hygiene_standard || 'Standard';
   const budget = params.budget || 'Medium';
   const instType = params.institution_type || 'Facility';
+  const occupants = meta.occupants || 'Unknown';
+  const floors = meta.floors || 1;
+  const frequency = meta.cleaning_frequency || 'daily';
+  const preferences = (meta.preferences || []).join(', ') || 'None';
 
-  return `You are a cleaning product procurement expert. Recommend 4-6 cleaning products for this Indian facility.
+  return `You are a cleaning product procurement expert for India. Recommend cleaning products for this specific facility.
 
-TYPE: ${instType}
-AREA: ${area}
-SURFACES: ${surfaces}
-HYGIENE: ${hygiene}
-BUDGET: ${budget}
+FACILITY DETAILS:
+- Type: ${instType}
+- Area: ${area}
+- Surfaces to clean: ${surfaces}
+- Hygiene standard required: ${hygiene}
+- Budget level: ${budget}
+- Occupants: ${occupants}
+- Floors: ${floors}
+- Cleaning frequency: ${frequency}
+- Available equipment: ${equipment}
+- Product preferences: ${preferences}
 
-For each: productId (e.g. REC-001), sku, name (use real Indian brands like Diversey, Savo, Vim, Lizol, Domex, Colin), recommended_dilution, estimated_monthly_qty_units, calculated_cost (INR), usage_guidance, safety_notes
+INSTRUCTIONS:
+1. Recommend an appropriate number of products based on the facility's needs (typically 4-10 products depending on size, surface types, and complexity)
+2. Products MUST match the specific surfaces listed above — recommend at least one product for each surface type
+3. Match products to the institution type (e.g., hospital needs disinfectants, school needs general cleaners, restaurant needs degreasers)
+4. Price products according to the budget level: low = economical brands (₹100-300/unit), medium = standard brands (₹150-500/unit), high = premium brands (₹300-800/unit)
+5. Calculate quantities based on area size — larger areas need more quantity
+6. Do NOT just recommend top brands — choose products that are appropriate for this specific facility's requirements and budget
+7. Set calculated_cost as (estimated_monthly_qty_units × unit_price)
+8. Set financialStatusAlert if total cost seems too high for the facility size/budget
+
+For each product: productId (e.g. REC-001), sku, name (use realistic Indian brands: low budget = local brands; medium = Savo, Vim, Lizol, Domex, Colin; high = Diversey, 3M, SC Johnson), recommended_dilution, estimated_monthly_qty_units, calculated_cost (INR total monthly), usage_guidance, safety_notes
 
 Respond ONLY with valid JSON matching this schema:
 {"recommendations":[{"productId":"","sku":"","name":"","recommended_dilution":"","estimated_monthly_qty_units":0,"calculated_cost":0,"usage_guidance":"","safety_notes":""}],"summary":{"grossAggregatedCost":0,"financialStatusAlert":null}}`;
@@ -344,8 +285,7 @@ function getCatalogForPrompt() {
 
 module.exports = {
   generateRecommendations,
-  getOpenAIKeyCandidates,
-  getGeminiKeyCandidates,
+  getGroqKeyCandidates,
   extractJSON,
   getStructuredModel,
 };

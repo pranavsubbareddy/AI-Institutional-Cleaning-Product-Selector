@@ -4,7 +4,6 @@ const { v4: uuidv4 } = require('uuid');
 const { body, validationResult } = require('express-validator');
 const { queryAll, queryOne, run, safeJsonParse } = require('../database/schema');
 const { generateRecommendations } = require('../engine/geminiService');
-const { MOCK_PRODUCT_CATALOG } = require('../engine/productCatalog');
 const { requireAuth } = require('../middleware/auth');
 
 // All recommendation routes require authentication
@@ -186,15 +185,24 @@ router.post('/process', validateProcessBody, async (req, res, next) => {
       });
     }
 
-    // --- Generate recommendation using AI engine only (no rule-based fallback) ---
-    const aiResult = await generateRecommendations(institution);
+    // --- Try the live AI engine first (LangChain OpenAI / Gemini) ---
+    let aiResult = null;
+    let aiError = null;
+    try {
+      aiResult = await generateRecommendations(institution);
+    } catch (err) {
+      aiError = err;
+      console.warn('  [recs] AI engine threw:', err.message);
+    }
 
     if (!aiResult || !aiResult.recommendations || aiResult.recommendations.length === 0) {
-      // No fallback — AI-only recommendations. All keys have been exhausted.
-      console.log('  All AI API keys exhausted. No fallback available — returning 503.');
+      // No local/default fallback — the user wants AI-only recommendations.
+      console.warn('  [recs] AI engine returned no recommendations. Surfacing 503.');
+      const detail = aiError ? aiError.message : 'AI engine returned no recommendations.';
       return res.status(503).json({
         success: false,
-        error: 'AI Engine is unavailable. All configured API keys (OpenAI & Gemini) were exhausted or rate-limited. Please add more API keys or try again later.',
+        error: 'AI Engine is unavailable. The Groq API key was exhausted or rate-limited. Please add more API keys or try again later.',
+        detail,
         timestamp: new Date().toISOString()
       });
     }
@@ -261,14 +269,6 @@ router.post('/process', validateProcessBody, async (req, res, next) => {
       );
     }));
 
-    // Build SKU lookups from DB products and hardcoded catalog for fallback
-    const catalogBySku = {};
-    try {
-      MOCK_PRODUCT_CATALOG.forEach(p => { catalogBySku[p.sku] = p; });
-    } catch (e) {
-      console.warn('[recommendations] productCatalog not available for SKU fallback');
-    }
-
     // Build aiResult lookups by SKU for robust fallback matching
     const aiResultBySku = {};
     aiResult.recommendations.forEach(r => {
@@ -288,14 +288,13 @@ router.post('/process', validateProcessBody, async (req, res, next) => {
        ORDER BY ri.priority ASC`, [recId    ])]);
 
     // If DB items have null product_name (because product_id was a SKU string),
-    // fill in from the catalog or Gemini output — matched by SKU, not by index
+    // fill in from the Gemini output — matched by SKU, not by index
     const responseItems = items.length > 0
       ? items.map(dbItem => {
           const aiMatch = aiResultBySku[dbItem.product_id];
           return {
             ...dbItem,
             product_name: dbItem.product_name
-              || (catalogBySku[dbItem.product_id]?.name)
               || aiMatch?.name
               || 'Unknown Product',
             usage_guidance: dbItem.usage_guidance
@@ -323,19 +322,19 @@ router.post('/process', validateProcessBody, async (req, res, next) => {
         recommendation: {
           ...recommendation,
           alerts: safeJsonParse(recommendation?.alerts, []),
-          source: 'AI_Engine',
-          status: 'Processed',
-          owner: 'system',
-          processed_at: new Date().toISOString()
-        },
-        items: responseItems,
-        institution_id: institution.id,
-        institution_name: institution.name,
-        summary,
-        source: 'AI_Engine',
-        isFallback: false,
-        grossAggregatedCost: aiResult.summary?.grossAggregatedCost || 0,
-        financialStatusAlert: aiResult.summary?.financialStatusAlert || null
+      source: 'AI_Engine',
+      status: 'Processed',
+      owner: 'system',
+      processed_at: new Date().toISOString()
+    },
+    items: responseItems,
+    institution_id: institution.id,
+    institution_name: institution.name,
+    summary,
+    source: 'AI_Engine',
+    isFallback: false,
+    grossAggregatedCost: aiResult.summary?.grossAggregatedCost || 0,
+    financialStatusAlert: aiResult.summary?.financialStatusAlert || null
       },
       timestamp: new Date().toISOString()
     });
@@ -392,7 +391,7 @@ router.get('/', async (req, res, next) => {
 router.get('/:id', async (req, res, next) => {
   try {
     const recommendation = await queryOne(
-      `SELECT r.*, i.name as institution_name, i.institution_type, i.area_size, i.hygiene_standard, i.budget, i.surface_types, i.metadata
+      `SELECT r.*, i.name as institution_name, i.institution_type, i.area_size, i.hygiene_standard, i.budget, i.surface_types, i.metadata, i.contact_email, i.contact_name
        FROM recommendations r JOIN institutions i ON r.institution_id = i.id WHERE r.id = ? AND i.user_id = ?`,
       [req.params.id, req.user.uid]
     );
@@ -417,15 +416,11 @@ router.get('/:id', async (req, res, next) => {
       [req.params.id]
     );
 
-    // Build fallback from MOCK_PRODUCT_CATALOG for items where LEFT JOIN missed
+    // Fill in missing product names for edge cases
     if (items.length > 0) {
-      const catBySku = {};
-      try { MOCK_PRODUCT_CATALOG.forEach(p => { catBySku[p.sku] = p; }); } catch (e) {}
       items = items.map(item => ({
         ...item,
-        product_name: item.product_name || catBySku[item.product_id]?.name || 'Unknown Product',
-        usage_guidance: item.usage_guidance || catBySku[item.product_id]?.usage_guidance || null,
-        safety_notes: item.safety_notes || catBySku[item.product_id]?.hazard_statements || null
+        product_name: item.product_name || 'Unknown Product'
       }));
     }
 
