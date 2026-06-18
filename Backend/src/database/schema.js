@@ -654,6 +654,14 @@ async function initializeSchema() {
     // Column already exists - ignore
   }
 
+  // Add product_name and unit_price columns to recommendation_items (for fallback when products table has stale data)
+  try {
+    await pool.execute('ALTER TABLE recommendation_items ADD COLUMN product_name VARCHAR(255) AFTER product_id');
+  } catch (e) { /* Column may already exist */ }
+  try {
+    await pool.execute('ALTER TABLE recommendation_items ADD COLUMN unit_price DECIMAL(10,2) DEFAULT 0 AFTER monthly_cost');
+  } catch (e) { /* Column may already exist */ }
+
   // Widen dilution_ratio columns to accommodate AI-generated values (safe if already widened)
   try {
     await pool.execute('ALTER TABLE products MODIFY COLUMN dilution_ratio VARCHAR(500)');

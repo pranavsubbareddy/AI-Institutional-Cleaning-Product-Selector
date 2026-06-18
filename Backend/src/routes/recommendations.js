@@ -268,13 +268,14 @@ router.post('/process', validateProcessBody, async (req, res, next) => {
       );
       await run(
         `INSERT INTO recommendation_items
-         (id, recommendation_id, product_id, quantity_estimate, dilution_ratio,
-          monthly_cost, usage_frequency, priority, usage_guidance, safety_notes)
-         VALUES (?, ?, ?, ?, ?, ?, 'Monthly', ?, ?, ?)`,
+         (id, recommendation_id, product_id, product_name, quantity_estimate, dilution_ratio,
+          monthly_cost, unit_price, usage_frequency, priority, usage_guidance, safety_notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Monthly', ?, ?, ?)`,
         [
           lineId, recId, productId,
+          item.name || 'AI-Generated Product',
           item.estimated_monthly_qty_units, item.recommended_dilution,
-          item.calculated_cost, 1,
+          item.calculated_cost, aiUnitPrice, 1,
           item.usage_guidance || null,
           item.safety_notes || null
         ]
@@ -310,12 +311,12 @@ router.post('/process', validateProcessBody, async (req, res, next) => {
         const product = productMap[item.product_id];
         return {
           ...item,
-          product_name: product?.name || 'Unknown Product',
+          product_name: item.product_name || product?.name || 'AI-Generated Product',
           category: product?.category || null,
           unit: product?.unit || 'litre',
           coverage_per_unit: product?.coverage_per_unit || 0,
-          unit_price: product?.unit_price || 0,
-          base_price: product?.unit_price || 0
+          unit_price: item.unit_price || product?.unit_price || 0,
+          base_price: product?.unit_price || item.unit_price || 0
         };
       });
     }
@@ -509,21 +510,23 @@ router.get('/:id', async (req, res, next) => {
       }
       items = items.map(item => {
         const product = productMap[item.product_id];
-        // Compute unit_price: prefer product table price, fallback to monthly_cost/qty
+        // Compute unit_price: prefer product table price, fallback to stored item price, then monthly_cost/qty
         const itemUnitPrice = product?.unit_price
+          || item.unit_price
           || (item.quantity_estimate > 0
             ? Math.round((item.monthly_cost || 0) / item.quantity_estimate)
             : 0);
         return {
           ...item,
-          product_name: product?.name || 'Unknown Product',
+          // Use stored product_name as primary source, fallback to products table, then AI-Generated
+          product_name: item.product_name || product?.name || 'AI-Generated Product',
           category: product?.category || null,
           safety_notes: item.safety_notes || product?.safety_notes || null,
           usage_guidance: item.usage_guidance || product?.usage_guidance || null,
           unit: product?.unit || 'litre',
           coverage_per_unit: product?.coverage_per_unit || 0,
           unit_price: itemUnitPrice,
-          base_price: itemUnitPrice
+          base_price: product?.unit_price || itemUnitPrice
         };
       });
     }
