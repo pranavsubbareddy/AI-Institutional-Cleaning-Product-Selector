@@ -9,9 +9,11 @@ const RecommendationSchema = z.object({
         productId: z.string().describe('Unique product ID (generate your own, e.g., AI-PROD-001)'),
         sku: z.string().describe('Product SKU code (generate your own)'),
         name: z.string().describe('Real institutional cleaning product name with brand'),
+        unit_price: z.number().describe('Unit price per litre or per unit in INR (e.g., 250 for Rs 250/litre)'),
         recommended_dilution: z.string().describe('Dilution ratio or "Ready to use"'),
         estimated_monthly_qty_units: z.number().describe('Estimated monthly quantity in units'),
-        calculated_cost: z.number().describe('Calculated monthly cost in INR'),
+        calculated_cost: z.number().describe('Calculated monthly cost in INR = unit_price × estimated_monthly_qty_units'),
+        coverage_per_unit: z.number().describe('Coverage area per unit in square feet (e.g., 500 for 500 sq.ft per litre)'),
         usage_guidance: z.string().describe('How to use the product'),
         safety_notes: z.string().describe('Safety precautions'),
       })
@@ -269,10 +271,13 @@ INSTRUCTIONS:
 4. Price products according to the budget level: low = economical brands (₹100-300/unit), medium = standard brands (₹150-500/unit), high = premium brands (₹300-800/unit)
 5. Calculate quantities based on area size — larger areas need more quantity
 6. Do NOT just recommend top brands — choose products that are appropriate for this specific facility's requirements and budget
-7. Set calculated_cost as (estimated_monthly_qty_units × unit_price)
-8. Set financialStatusAlert if total cost seems too high for the facility size/budget
+7. Set unit_price as the price per litre/unit in INR (e.g., 250 for Rs 250/litre)
+8. Set calculated_cost as (estimated_monthly_qty_units × unit_price) — these MUST be consistent
+9. Set coverage_per_unit as the area in square feet that one unit covers (e.g., 500 for a litre)
+10. Set financialStatusAlert if total cost seems too high for the facility size/budget
+11. Ensure grossAggregatedCost equals the sum of all calculated_cost values
 
-For each product: productId (e.g. REC-001), sku, name (use realistic Indian brands: low budget = local brands; medium = Savo, Vim, Lizol, Domex, Colin; high = Diversey, 3M, SC Johnson), recommended_dilution, estimated_monthly_qty_units, calculated_cost (INR total monthly), usage_guidance, safety_notes
+For each product: productId (e.g. REC-001), sku, name (use realistic Indian brands: low budget = local brands; medium = Savo, Vim, Lizol, Domex, Colin; high = Diversey, 3M, SC Johnson), unit_price (Rs per litre), recommended_dilution, estimated_monthly_qty_units, calculated_cost (INR total monthly), coverage_per_unit (sq.ft per litre), usage_guidance, safety_notes
 
 Respond ONLY with valid JSON matching this schema:
 {"recommendations":[{"productId":"","sku":"","name":"","recommended_dilution":"","estimated_monthly_qty_units":0,"calculated_cost":0,"usage_guidance":"","safety_notes":""}],"summary":{"grossAggregatedCost":0,"financialStatusAlert":null}}`;

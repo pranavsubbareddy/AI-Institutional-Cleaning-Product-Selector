@@ -78,6 +78,7 @@ export default function RequirementForm() {
     contact_name: '',
     contact_email: '',
     contact_phone: '',
+    address: '',
     // Advanced fields
     floors: 1,
     occupants: 50,
@@ -88,6 +89,7 @@ export default function RequirementForm() {
     preferences: [],
     facility_description: '',
     current_products: '',
+    special_requirements: '',
   });
 
   const handleChange = (e) => {
@@ -120,6 +122,7 @@ export default function RequirementForm() {
         contact_name: formData.contact_name || null,
         contact_email: formData.contact_email || null,
         contact_phone: formData.contact_phone || null,
+        address: formData.address || null,
         metadata: {
           floors: formData.floors,
           occupants: formData.occupants,
@@ -130,6 +133,7 @@ export default function RequirementForm() {
           preferences: formData.preferences,
           facility_description: formData.facility_description || null,
           current_products: formData.current_products || null,
+          special_requirements: formData.special_requirements || null,
         },
       });
 
@@ -315,6 +319,30 @@ export default function RequirementForm() {
                 </div>
               </div>
             </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="label">Contact Name</label>
+                <input type="text" name="contact_name" value={formData.contact_name} onChange={handleChange}
+                  className="input-field" placeholder="e.g., Dr. Sharma" />
+              </div>
+              <div>
+                <label className="label">Contact Email</label>
+                <input type="email" name="contact_email" value={formData.contact_email} onChange={handleChange}
+                  className="input-field" placeholder="e.g., manager@hospital.com" />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="label">Contact Phone</label>
+                <input type="tel" name="contact_phone" value={formData.contact_phone} onChange={handleChange}
+                  className="input-field" placeholder="e.g., +91 98765 43210" />
+              </div>
+              <div>
+                <label className="label">Address / Location</label>
+                <input type="text" name="address" value={formData.address} onChange={handleChange}
+                  className="input-field" placeholder="e.g., 123 Main Street, Delhi" />
+              </div>
+            </div>
             <div>
               <label className="label">Facility Description (Optional)</label>
               <textarea name="facility_description" value={formData.facility_description} onChange={handleChange}
@@ -459,6 +487,12 @@ export default function RequirementForm() {
               <textarea name="current_products" value={formData.current_products} onChange={handleChange}
                 className="input-field" rows="2" placeholder="List any cleaning products you currently use or brands you prefer..."></textarea>
             </div>
+
+            <div>
+              <label className="label">Special Requirements (Optional)</label>
+              <textarea name="special_requirements" value={formData.special_requirements} onChange={handleChange}
+                className="input-field" rows="2" placeholder="Any special cleaning requirements, regulatory compliance needs, or unique constraints..."></textarea>
+            </div>
           </div>
         )}
 
@@ -485,9 +519,13 @@ export default function RequirementForm() {
                   <div className="flex justify-between"><dt className="text-surface-400">Name</dt><dd className="text-surface-200 font-medium">{formData.name}</dd></div>
                   <div className="flex justify-between"><dt className="text-surface-400">Type</dt><dd className="text-surface-200 capitalize">{formData.institution_type}</dd></div>
                   <div className="flex justify-between"><dt className="text-surface-400">Area</dt><dd className="text-surface-200">{Number(formData.area_size).toLocaleString()} sq. ft.</dd></div>
+                  {formData.address && <div className="flex justify-between"><dt className="text-surface-400">Address</dt><dd className="text-surface-200 truncate max-w-[180px]">{formData.address}</dd></div>}
                   <div className="flex justify-between"><dt className="text-surface-400">Floors</dt><dd className="text-surface-200">{formData.floors}</dd></div>
                   <div className="flex justify-between"><dt className="text-surface-400">Occupants</dt><dd className="text-surface-200">{formData.occupants}+</dd></div>
                   <div className="flex justify-between"><dt className="text-surface-400">Hours</dt><dd className="text-surface-200 capitalize">{OPERATING_HOURS.find(o=>o.value===formData.operating_hours)?.label||formData.operating_hours}</dd></div>
+                  {formData.contact_name && <div className="flex justify-between"><dt className="text-surface-400">Contact</dt><dd className="text-surface-200">{formData.contact_name}</dd></div>}
+                  {formData.contact_email && <div className="flex justify-between"><dt className="text-surface-400">Email</dt><dd className="text-surface-200 truncate max-w-[180px]">{formData.contact_email}</dd></div>}
+                  {formData.contact_phone && <div className="flex justify-between"><dt className="text-surface-400">Phone</dt><dd className="text-surface-200">{formData.contact_phone}</dd></div>}
                 </dl>
               </div>
               <div className="bg-surface-700/30 rounded-xl p-4 border border-surface-600/50">
@@ -509,6 +547,24 @@ export default function RequirementForm() {
                   {formData.equipment.map(e => <span key={e} className="badge bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">{EQUIPMENT_OPTIONS.find(o=>o.value===e)?.label||e}</span>)}
                   {formData.preferences.map(p => <span key={p} className="badge bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">{PREFERENCES_OPTIONS.find(o=>o.value===p)?.icon} {PREFERENCES_OPTIONS.find(o=>o.value===p)?.label||p}</span>)}
                 </div>
+              </div>
+            )}
+            {formData.current_products && (
+              <div className="bg-surface-700/30 rounded-xl p-4 border border-surface-600/50">
+                <h4 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">Current Products</h4>
+                <p className="text-sm text-surface-300">{formData.current_products}</p>
+              </div>
+            )}
+            {formData.special_requirements && (
+              <div className="bg-surface-700/30 rounded-xl p-4 border border-surface-600/50">
+                <h4 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">Special Requirements</h4>
+                <p className="text-sm text-surface-300">{formData.special_requirements}</p>
+              </div>
+            )}
+            {formData.facility_description && (
+              <div className="bg-surface-700/30 rounded-xl p-4 border border-surface-600/50">
+                <h4 className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-2">Description</h4>
+                <p className="text-sm text-surface-300">{formData.facility_description}</p>
               </div>
             )}
           </div>

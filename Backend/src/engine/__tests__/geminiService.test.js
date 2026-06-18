@@ -1,7 +1,6 @@
 const {
   generateRecommendations,
-  getOpenAIKeyCandidates,
-  getGeminiKeyCandidates,
+  getGroqKeyCandidates,
   extractJSON,
 } = require('../geminiService');
 
@@ -22,68 +21,62 @@ function makeParams(overrides = {}) {
 
 function clearAIKeys() {
   Object.keys(process.env)
-    .filter(name => /^(?:OPENAI|GEMINI|GOOGLE(?:_AI)?)_(?:API_)?KEYS?(_\d+)?$/i.test(name))
+    .filter(name => /^(?:OPENAI|GEMINI|GOOGLE(?:_AI)?|GROQ)(?:_(?:API_)?KEYS?|_(?:API_)?KEY_\d+)$/i.test(name)
+      || /^GROQ_(?:API_)?KEY_\d+$/i.test(name))
     .forEach(name => {
       delete process.env[name];
     });
 }
 
 // ---------------------------------------------------------------------------
-// 1. getOpenAIKeyCandidates TESTS
+// 1. getGroqKeyCandidates TESTS
 // ---------------------------------------------------------------------------
-describe('getOpenAIKeyCandidates', () => {
+describe('getGroqKeyCandidates', () => {
   const OLD_ENV = process.env;
 
   afterAll(() => {
     process.env = OLD_ENV;
   });
 
-  test('collects comma-separated and numbered OpenAI keys', () => {
+  test('collects comma-separated and numbered Groq keys', () => {
     clearAIKeys();
-    process.env.OPENAI_API_KEYS = 'sk-proj-a, sk-proj-b';
-    process.env.OPENAI_API_KEY_2 = 'sk-proj-d';
-    process.env.OPENAI_API_KEY_1 = 'sk-proj-c';
+    process.env.GROQ_API_KEYS = 'gsk_key-a, gsk_key-b';
+    process.env.GROQ_API_KEY_2 = 'gsk_key-d';
+    process.env.GROQ_API_KEY_1 = 'gsk_key-c';
 
-    expect(getOpenAIKeyCandidates()).toEqual([
-      'sk-proj-a',
-      'sk-proj-b',
-      'sk-proj-c',
-      'sk-proj-d',
+    expect(getGroqKeyCandidates()).toEqual([
+      'gsk_key-a',
+      'gsk_key-b',
+      'gsk_key-c',
+      'gsk_key-d',
     ]);
   });
 
-  test('accepts Gemini env names only when they contain OpenAI keys', () => {
+  test('collects Groq keys from single GROQ_API_KEY env var', () => {
     clearAIKeys();
-    process.env.GEMINI_API_KEY = 'not-openai-key';
-    process.env.GEMINI_API_KEYS = 'sk-proj-from-gemini-name';
+    process.env.GROQ_API_KEY = 'gsk_single-key';
 
-    expect(getOpenAIKeyCandidates()).toEqual(['sk-proj-from-gemini-name']);
-  });
-});
-
-describe('getGeminiKeyCandidates', () => {
-  const OLD_ENV = process.env;
-
-  afterAll(() => {
-    process.env = OLD_ENV;
+    expect(getGroqKeyCandidates()).toEqual(['gsk_single-key']);
   });
 
-  test('collects Gemini keys and ignores OpenAI keys in Gemini env vars', () => {
+  test('ignores non-gsk_ prefixed keys', () => {
     clearAIKeys();
-    process.env.GEMINI_API_KEYS = 'AIza-valid-gemini-key-one-12345, sk-proj-openai';
-    process.env.GEMINI_API_KEY_1 = 'AIza-valid-gemini-key-two-12345';
+    process.env.GROQ_API_KEY = 'not-a-groq-key';
 
-    expect(getGeminiKeyCandidates()).toEqual([
-      'AIza-valid-gemini-key-one-12345',
-      'AIza-valid-gemini-key-two-12345',
-    ]);
+    expect(getGroqKeyCandidates()).toEqual([]);
   });
 
-  test('reads GOOGLE_API_KEY as Gemini key', () => {
+  test('deduplicates keys across env vars', () => {
     clearAIKeys();
-    process.env.GOOGLE_API_KEY = 'AIza-valid-google-key-one-12345';
+    process.env.GROQ_API_KEY = 'gsk_dup-key';
+    process.env.GROQ_API_KEYS = 'gsk_dup-key, gsk_other-key';
 
-    expect(getGeminiKeyCandidates()).toEqual(['AIza-valid-google-key-one-12345']);
+    expect(getGroqKeyCandidates()).toEqual(['gsk_dup-key', 'gsk_other-key']);
+  });
+
+  test('returns empty array when no Groq keys are set', () => {
+    clearAIKeys();
+    expect(getGroqKeyCandidates()).toEqual([]);
   });
 });
 
@@ -110,7 +103,7 @@ describe('generateRecommendations — null return when API key missing', () => {
 
   test('returns null when API key format is invalid', async () => {
     clearAIKeys();
-    process.env.OPENAI_API_KEY = 'invalid-key-format';
+    process.env.GROQ_API_KEY = 'invalid-key-format';
     jest.resetModules();
     const mod = require('../geminiService');
     const result = await mod.generateRecommendations(makeParams());
@@ -199,7 +192,7 @@ describe('extractJSON', () => {
   });
 
   // ── BOM character ─────────────────────────────────────────────────────
-  test('removes BOM character (\uFEFF) prefix', () => {
+  test('removes BOM character (\\uFEFF) prefix', () => {
     const input = '\uFEFF{"key": "value"}';
     expect(extractJSON(input)).toEqual({ key: 'value' });
   });
@@ -378,7 +371,7 @@ describe('Edge cases — no API key', () => {
 
   test('returns null when API key format is invalid', async () => {
     clearAIKeys();
-    process.env.OPENAI_API_KEY = 'bad-key';
+    process.env.GROQ_API_KEY = 'bad-key';
     jest.resetModules();
     const mod = require('../geminiService');
     const result = await mod.generateRecommendations(makeParams());

@@ -86,6 +86,48 @@ export async function sendFormWithReportEmail(formData, recommendationData) {
   const totalCost = recommendationData?.grossAggregatedCost || recommendationData?.total_estimated_cost || 0;
   const alerts = recommendationData?.alerts || [];
 
+  // Build contact info section
+  const contactInfoHtml = [];
+  if (formData.contact_name) contactInfoHtml.push('<tr><td style="padding:6px 12px;color:#64748b;font-size:13px;">Name</td><td style="padding:6px 12px;color:#1e293b;font-size:13px;font-weight:500;">' + formData.contact_name + '</td></tr>');
+  if (formData.contact_email) contactInfoHtml.push('<tr><td style="padding:6px 12px;color:#64748b;font-size:13px;">Email</td><td style="padding:6px 12px;color:#1e293b;font-size:13px;font-weight:500;">' + formData.contact_email + '</td></tr>');
+  if (formData.contact_phone) contactInfoHtml.push('<tr><td style="padding:6px 12px;color:#64748b;font-size:13px;">Phone</td><td style="padding:6px 12px;color:#1e293b;font-size:13px;font-weight:500;">' + formData.contact_phone + '</td></tr>');
+  if (formData.address) contactInfoHtml.push('<tr><td style="padding:6px 12px;color:#64748b;font-size:13px;">Address</td><td style="padding:6px 12px;color:#1e293b;font-size:13px;font-weight:500;">' + formData.address + '</td></tr>');
+
+  // Build facility info section
+  const facilityInfoHtml = [
+    '<tr><td style="padding:6px 12px;color:#64748b;font-size:13px;">Facility Name</td><td style="padding:6px 12px;color:#1e293b;font-size:13px;font-weight:500;">' + (formData.name || 'N/A') + '</td></tr>',
+    '<tr><td style="padding:6px 12px;color:#64748b;font-size:13px;">Type</td><td style="padding:6px 12px;color:#1e293b;font-size:13px;font-weight:500;">' + (formData.institution_type || 'N/A') + '</td></tr>',
+    '<tr><td style="padding:6px 12px;color:#64748b;font-size:13px;">Area</td><td style="padding:6px 12px;color:#1e293b;font-size:13px;font-weight:500;">' + Number(formData.area_size || 0).toLocaleString() + ' sq. ft.</td></tr>',
+    '<tr><td style="padding:6px 12px;color:#64748b;font-size:13px;">Floors</td><td style="padding:6px 12px;color:#1e293b;font-size:13px;font-weight:500;">' + (formData.floors || 1) + '</td></tr>',
+    '<tr><td style="padding:6px 12px;color:#64748b;font-size:13px;">Occupants</td><td style="padding:6px 12px;color:#1e293b;font-size:13px;font-weight:500;">' + (formData.occupants || 'N/A') + '+</td></tr>',
+    '<tr><td style="padding:6px 12px;color:#64748b;font-size:13px;">Operating Hours</td><td style="padding:6px 12px;color:#1e293b;font-size:13px;font-weight:500;">' + (formData.operating_hours || 'N/A') + '</td></tr>',
+    '<tr><td style="padding:6px 12px;color:#64748b;font-size:13px;">Surfaces</td><td style="padding:6px 12px;color:#1e293b;font-size:13px;font-weight:500;">' + ((formData.surface_types || []).map(s => surfaceLabels[s] || s).join(', ') || 'N/A') + '</td></tr>',
+    '<tr><td style="padding:6px 12px;color:#64748b;font-size:13px;">Hygiene Standard</td><td style="padding:6px 12px;color:#1e293b;font-size:13px;font-weight:500;">' + ((formData.hygiene_standard || '').replace('_', ' ') || 'N/A') + '</td></tr>',
+    '<tr><td style="padding:6px 12px;color:#64748b;font-size:13px;">Budget</td><td style="padding:6px 12px;color:#1e293b;font-size:13px;font-weight:500;">' + (formData.budget || 'N/A') + '</td></tr>',
+    '<tr><td style="padding:6px 12px;color:#64748b;font-size:13px;">Cleaning Frequency</td><td style="padding:6px 12px;color:#1e293b;font-size:13px;font-weight:500;">' + (frequencyLabels[formData.cleaning_frequency] || formData.cleaning_frequency || 'N/A') + '</td></tr>',
+    '<tr><td style="padding:6px 12px;color:#64748b;font-size:13px;">Facility Age</td><td style="padding:6px 12px;color:#1e293b;font-size:13px;font-weight:500;">' + (formData.facility_age || 'N/A') + '</td></tr>',
+  ];
+  if ((formData.equipment || []).length > 0) {
+    facilityInfoHtml.push('<tr><td style="padding:6px 12px;color:#64748b;font-size:13px;">Equipment</td><td style="padding:6px 12px;color:#1e293b;font-size:13px;font-weight:500;">' + formData.equipment.map(e => equipmentLabels[e] || e).join(', ') + '</td></tr>');
+  }
+
+  // Optional fields - only include if user filled them in
+  const optionalFieldsHtml = [];
+  if ((formData.preferences || []).length > 0) {
+    optionalFieldsHtml.push('<tr><td style="padding:6px 12px;color:#64748b;font-size:13px;">Product Preferences</td><td style="padding:6px 12px;color:#1e293b;font-size:13px;font-weight:500;">' + formData.preferences.map(p => preferenceLabels[p] || p).join(', ') + '</td></tr>');
+  }
+  if (formData.current_products) {
+    optionalFieldsHtml.push('<tr><td style="padding:6px 12px;color:#64748b;font-size:13px;">Current Products Used</td><td style="padding:6px 12px;color:#1e293b;font-size:13px;font-weight:500;">' + formData.current_products + '</td></tr>');
+  }
+  if (formData.special_requirements) {
+    optionalFieldsHtml.push('<tr><td style="padding:6px 12px;color:#64748b;font-size:13px;">Special Requirements</td><td style="padding:6px 12px;color:#1e293b;font-size:13px;font-weight:500;">' + formData.special_requirements + '</td></tr>');
+  }
+  if (formData.facility_description) {
+    optionalFieldsHtml.push('<tr><td style="padding:6px 12px;color:#64748b;font-size:13px;">Description</td><td style="padding:6px 12px;color:#1e293b;font-size:13px;font-weight:500;">' + formData.facility_description + '</td></tr>');
+  }
+
+  const allInfoRows = contactInfoHtml.join('') + facilityInfoHtml.join('') + optionalFieldsHtml.join('');
+
   const templateParams = {
     to_email: formData.contact_email,
     contact_name: formData.contact_name || 'N/A',
@@ -98,22 +140,26 @@ export async function sendFormWithReportEmail(formData, recommendationData) {
     floors: String(formData.floors || 1),
     occupants: String(formData.occupants || 'N/A'),
     operating_hours: formData.operating_hours || 'N/A',
-    facility_description: formData.facility_description || 'Not provided',
+    facility_description: formData.facility_description || '',
     surface_types: (formData.surface_types || []).map(s => surfaceLabels[s] || s).join(', ') || 'N/A',
     hygiene_standard: (formData.hygiene_standard || '').replace('_', ' ') || 'N/A',
     budget: formData.budget || 'N/A',
     cleaning_frequency: frequencyLabels[formData.cleaning_frequency] || formData.cleaning_frequency || 'N/A',
     facility_age: formData.facility_age || 'N/A',
-    equipment: (formData.equipment || []).map(e => equipmentLabels[e] || e).join(', ') || 'None selected',
-    preferences: (formData.preferences || []).map(p => preferenceLabels[p] || p).join(', ') || 'None selected',
-    special_requirements: formData.special_requirements || 'None',
-    current_products: formData.current_products || 'None',
+    equipment: (formData.equipment || []).map(e => equipmentLabels[e] || e).join(', ') || '',
+    preferences: (formData.preferences || []).length > 0 ? formData.preferences.map(p => preferenceLabels[p] || p).join(', ') : '',
+    special_requirements: formData.special_requirements || '',
+    current_products: formData.current_products || '',
     recommendation_summary: recommendationData?.summary || 'Recommendation generated successfully.',
     total_cost: 'Rs ' + Number(totalCost).toLocaleString('en-IN') + '/month',
     item_count: String(items.length),
     alerts_text: alerts.length > 0 ? alerts.join('\n• ') : 'None',
     alerts_html: alerts.length > 0 ? alerts.map(a => '<li>' + a + '</li>').join('') : '<li>No alerts</li>',
     product_details_html: items.length > 0 ? buildProductTable(productRows, totalCost) : '<p>No product recommendations.</p>',
+    contact_info_html: contactInfoHtml.length > 0 ? '<table style="width:100%;border-collapse:collapse;margin-bottom:8px;">' + contactInfoHtml.join('') + '</table>' : '<p style="color:#94a3b8;font-size:13px;">No contact information provided</p>',
+    facility_info_html: '<table style="width:100%;border-collapse:collapse;margin-bottom:8px;">' + facilityInfoHtml.join('') + '</table>',
+    optional_fields_html: optionalFieldsHtml.length > 0 ? '<table style="width:100%;border-collapse:collapse;margin-top:8px;">' + optionalFieldsHtml.join('') + '</table>' : '',
+    all_info_html: '<table style="width:100%;border-collapse:collapse;">' + allInfoRows + '</table>',
   };
 
   try {

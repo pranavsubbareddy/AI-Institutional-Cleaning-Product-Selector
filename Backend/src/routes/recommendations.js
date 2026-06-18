@@ -93,7 +93,7 @@ async function ensureProductExists(productId, productSku, productData = {}) {
   const finalId = productId || uuidv4();
   const name = productData.name || productData.product_name || 'AI-Generated Product';
   const category = productData.category || 'General';
-  const unitPrice = productData.unit_price || productData.calculated_cost || 0;
+  const unitPrice = productData.unit_price || 0;
   const unit = productData.unit || 'litre';
   const dilutionRatio = productData.dilution_ratio || productData.recommended_dilution || null;
   const coveragePerUnit = productData.coverage_per_unit || 0;
@@ -217,15 +217,22 @@ router.post('/process', validateProcessBody, async (req, res, next) => {
       (sum, r) => sum + (r.estimated_monthly_qty_units || 0), 0
     );
 
+    // Compute total from sum of individual item costs (more reliable than AI's summary total)
+    const computedTotalCost = aiResult.recommendations.reduce(
+      (sum, r) => sum + (r.calculated_cost || 0), 0
+    );
+    // Use computed total as the authoritative value (AI's grossAggregatedCost may be inconsistent)
+    const totalEstCost = computedTotalCost > 0 ? computedTotalCost : (aiResult.summary?.grossAggregatedCost || 0);
+
     const summary = `Recommended ${aiResult.recommendations.length} products for ${institution.institution_type} facility of ${institution.area_size} sq. ft. ` +
-      `Monthly cost: Rs ${(aiResult.summary?.grossAggregatedCost || 0).toLocaleString('en-IN')}.`;
+      `Monthly cost: Rs ${totalEstCost.toLocaleString('en-IN')}.`;
 
     await run(
       `INSERT INTO recommendations (id, institution_id, status, total_estimated_cost, monthly_total_quantity, summary, alerts, source, owner, processed_at)
        VALUES (?, ?, 'Processed', ?, ?, ?, ?, ?, 'system', NOW())`,
       [
         recId, institution.id,
-        aiResult.summary?.grossAggregatedCost || 0,
+        totalEstCost,
         totalMonthlyQty, summary,
         JSON.stringify(alerts),
         'AI_Engine'
@@ -240,16 +247,21 @@ router.post('/process', validateProcessBody, async (req, res, next) => {
       const lineId = uuidv4();
       const pid = item.productId || item.product_id || '';
       const sku = item.sku || '';
+      // Compute unit_price: prefer AI's unit_price, fallback to calculated_cost/qty, then 0
+      const aiUnitPrice = item.unit_price
+        || (item.estimated_monthly_qty_units > 0
+          ? Math.round((item.calculated_cost || 0) / item.estimated_monthly_qty_units)
+          : 0);
       const productId = await ensureProductExists(
         pid || null,
         sku || null,
         {
           name: item.name,
           category: item.category,
-          unit_price: item.unit_price || item.calculated_cost,
+          unit_price: aiUnitPrice,
           unit: 'litre',
           dilution_ratio: item.recommended_dilution,
-          coverage_per_unit: 0,
+          coverage_per_unit: item.coverage_per_unit || 0,
           usage_guidance: item.usage_guidance,
           safety_notes: item.safety_notes
         }
@@ -302,6 +314,7 @@ router.post('/process', validateProcessBody, async (req, res, next) => {
           category: product?.category || null,
           unit: product?.unit || 'litre',
           coverage_per_unit: product?.coverage_per_unit || 0,
+          unit_price: product?.unit_price || 0,
           base_price: product?.unit_price || 0
         };
       });
@@ -312,8 +325,16 @@ router.post('/process', validateProcessBody, async (req, res, next) => {
     const responseItems = items.length > 0
       ? items.map(dbItem => {
           const aiMatch = aiResultBySku[dbItem.product_id];
+          // Compute unit_price: prefer DB product price, fallback to AI match, then 0
+          const itemUnitPrice = dbItem.unit_price
+            || aiMatch?.unit_price
+            || (dbItem.quantity_estimate > 0
+              ? Math.round((dbItem.monthly_cost || 0) / dbItem.quantity_estimate)
+              : 0);
           return {
             ...dbItem,
+            unit_price: itemUnitPrice,
+            base_price: dbItem.base_price || itemUnitPrice,
             product_name: dbItem.product_name
               || aiMatch?.name
               || 'Unknown Product',
@@ -331,6 +352,8 @@ router.post('/process', validateProcessBody, async (req, res, next) => {
           quantity_estimate: r.estimated_monthly_qty_units,
           dilution_ratio: r.recommended_dilution,
           monthly_cost: r.calculated_cost,
+          unit_price: r.unit_price || (r.estimated_monthly_qty_units > 0 ? Math.round(r.calculated_cost / r.estimated_monthly_qty_units) : 0),
+          coverage_per_unit: r.coverage_per_unit || 0,
           usage_guidance: r.usage_guidance,
           safety_notes: r.safety_notes
         }));
@@ -353,7 +376,7 @@ router.post('/process', validateProcessBody, async (req, res, next) => {
     summary,
     source: 'AI_Engine',
     isFallback: false,
-    grossAggregatedCost: aiResult.summary?.grossAggregatedCost || 0,
+    grossAggregatedCost: totalEstCost,
     financialStatusAlert: aiResult.summary?.financialStatusAlert || null
       },
       timestamp: new Date().toISOString()
@@ -486,6 +509,11 @@ router.get('/:id', async (req, res, next) => {
       }
       items = items.map(item => {
         const product = productMap[item.product_id];
+        // Compute unit_price: prefer product table price, fallback to monthly_cost/qty
+        const itemUnitPrice = product?.unit_price
+          || (item.quantity_estimate > 0
+            ? Math.round((item.monthly_cost || 0) / item.quantity_estimate)
+            : 0);
         return {
           ...item,
           product_name: product?.name || 'Unknown Product',
@@ -494,15 +522,22 @@ router.get('/:id', async (req, res, next) => {
           usage_guidance: item.usage_guidance || product?.usage_guidance || null,
           unit: product?.unit || 'litre',
           coverage_per_unit: product?.coverage_per_unit || 0,
-          base_price: product?.unit_price || 0
+          unit_price: itemUnitPrice,
+          base_price: itemUnitPrice
         };
       });
     }
+
+    // Compute total from sum of item monthly_costs (more reliable than stored total)
+    const computedTotal = items.reduce(
+      (sum, item) => sum + Number(item.monthly_cost || 0), 0
+    );
 
     res.json({
       success: true,
       data: {
         ...recommendation,
+        total_estimated_cost: computedTotal > 0 ? computedTotal : recommendation.total_estimated_cost,
         alerts: safeJsonParse(recommendation.alerts, []),
         surface_types: safeJsonParse(recommendation.surface_types, []),
         items

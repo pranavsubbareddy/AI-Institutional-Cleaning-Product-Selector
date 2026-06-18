@@ -41,7 +41,8 @@ export default function Recommendations() {
   };
 
   const handleCopyQuotation = (item) => {
-    const text = `${item.product_name} - ${item.quantity_estimate} ${item.unit} @ Rs ${item.unit_price}/${item.unit} = Rs ${item.monthly_cost?.toLocaleString('en-IN')}/month`;
+    const price = item.unit_price || item.base_price || 0;
+    const text = `${item.product_name} - ${item.quantity_estimate} ${item.unit || 'litre'} @ Rs ${price}/${item.unit || 'litre'} = Rs ${item.monthly_cost?.toLocaleString('en-IN')}/month`;
     navigator.clipboard.writeText(text).then(() => {
       setCopiedProductId(item.id || item.product_name);
       setTimeout(() => setCopiedProductId(null), 2000);
@@ -161,10 +162,14 @@ export default function Recommendations() {
   const handleCopyAll = () => {
     if (!data?.items) return;
     const text = data.items.map(item =>
-      `${item.product_name} | Qty: ${item.quantity_estimate} ${item.unit} | Price: Rs ${item.unit_price} | Monthly: Rs ${item.monthly_cost?.toLocaleString('en-IN')} | ${item.dilution_ratio}`
+      `${item.product_name} | Qty: ${item.quantity_estimate} ${item.unit || 'litre'} | Price: Rs ${item.unit_price || item.base_price || 0} | Monthly: Rs ${item.monthly_cost?.toLocaleString('en-IN')} | ${item.dilution_ratio}`
     ).join('\n');
     
-    const fullText = `QUOTATION - ${data.institution_name}\n${'='.repeat(40)}\n${text}\n${'='.repeat(40)}\nTotal Monthly Cost: ${formatCurrency(data.total_estimated_cost)}\n`;
+    // Compute total from items for reliability
+    const computedTotal = data.items.reduce((sum, item) => sum + Number(item.monthly_cost || 0), 0);
+    const totalCost = computedTotal > 0 ? computedTotal : data.total_estimated_cost;
+    
+    const fullText = `QUOTATION - ${data.institution_name}\n${'='.repeat(40)}\n${text}\n${'='.repeat(40)}\nTotal Monthly Cost: ${formatCurrency(totalCost)}\n`;
     
     navigator.clipboard.writeText(fullText).then(() => {
       setCopiedProductId('all');
@@ -520,7 +525,7 @@ export default function Recommendations() {
                 <td className="py-3 px-3 font-semibold text-surface-200" colSpan="2">Total Monthly Estimate</td>
                 <td className="text-right py-3 px-3 font-semibold text-surface-200">{data.monthly_total_quantity || 0} {data.items?.[0]?.unit || 'units'}</td>
                 <td className="text-right py-3 px-3"></td>
-                <td className="text-right py-3 px-3 font-bold text-emerald-400">{formatCurrency(data.total_estimated_cost)}</td>
+                <td className="text-right py-3 px-3 font-bold text-emerald-400">{formatCurrency(data.items?.reduce((sum, item) => sum + Number(item.monthly_cost || 0), 0) || data.total_estimated_cost)}</td>
               </tr>
             </tfoot>
           </table>

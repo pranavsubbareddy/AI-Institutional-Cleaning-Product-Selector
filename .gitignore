@@ -15,3 +15,4 @@ Backend/node_modules/
 .vercel/
 .vercel
 nul
+.env.vercel
