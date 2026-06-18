@@ -76,6 +76,16 @@ const validateProcessBody = [
 // when AI generates dynamic product IDs that don't exist yet.
 // ---------------------------------------------------------------------------
 async function ensureProductExists(productId, productSku, productData = {}) {
+  // Reject catalog-placeholder names — these are hallucinated brands from
+  // older AI runs (e.g. "Ganga Heavy Duty Degreaser") that the user has
+  // explicitly asked us to never seed again.
+  const name = productData.name || productData.product_name || '';
+  if (isCatalogPlaceholderName(name)) {
+    const err = new Error('Catalog-placeholder product rejected: ' + name);
+    err.code = 'CATALOG_PLACEHOLDER';
+    throw err;
+  }
+
   // Check if already exists by id or sku
   let existing = null;
   if (productId) {
@@ -91,7 +101,7 @@ async function ensureProductExists(productId, productSku, productData = {}) {
 
   // Insert the product dynamically
   const finalId = productId || uuidv4();
-  const name = productData.name || productData.product_name || 'AI-Generated Product';
+  const safeName = name || 'AI-Generated Product';
   const category = productData.category || 'General';
   const unitPrice = productData.unit_price || 0;
   const unit = productData.unit || 'litre';
@@ -105,14 +115,14 @@ async function ensureProductExists(productId, productSku, productData = {}) {
       `INSERT INTO products (id, sku, name, description, category, surface_types, dilution_ratio, unit, unit_price, coverage_per_unit, safety_notes, usage_guidance, hygiene_level)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        finalId, productSku || finalId, name,
+        finalId, productSku || finalId, safeName,
         `${category} cleaning product - AI generated`,
         category, '[]', dilutionRatio,
         unit, Number(unitPrice), Number(coveragePerUnit),
         safetyNotes, usageGuidance, 'standard'
       ]
     );
-    console.log(`  [DB] Dynamically inserted product "${name}" with id=${finalId}`);
+    console.log(`  [DB] Dynamically inserted product "${safeName}" with id=${finalId}`);
   } catch (insertErr) {
     // Race condition or duplicate — check if it was inserted by another request
     const retry = await queryOne('SELECT id FROM products WHERE id = ? OR sku = ?', [finalId, productSku || finalId]);
@@ -122,6 +132,15 @@ async function ensureProductExists(productId, productSku, productData = {}) {
     throw insertErr;
   }
   return finalId;
+}
+
+// Returns true for hallucinated catalog-style brand prefixes the AI has
+// historically invented (e.g. "Ganga Heavy Duty Degreaser"). Used as a
+// runtime guard so these never reach the products table or quotation.
+function isCatalogPlaceholderName(name) {
+  const n = String(name || '').trim().toLowerCase();
+  if (!n) return true;
+  return n.startsWith('ganga ') || n === 'ganga' || /^ganga\b/.test(n);
 }
 
 // ---------------------------------------------------------------------------
@@ -203,6 +222,30 @@ router.post('/process', validateProcessBody, async (req, res, next) => {
         success: false,
         error: 'AI Engine is unavailable. The Groq API key was exhausted or rate-limited. Please add more API keys or try again later.',
         detail,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // --- Strip catalog/hallucinated brand placeholders ---
+    // The AI has been observed to invent "Ganga …" prefixed products that are
+    // catalog placeholders, not real Indian cleaning brands. The user wants
+    // only real AI recommendations — drop any line that still carries such
+    // a placeholder so they never reach the quotation or persist in storage.
+    const isCatalogPlaceholder = (name) => {
+      const n = String(name || '').trim().toLowerCase();
+      if (!n) return true;
+      return n.startsWith('ganga ') || n === 'ganga' || /^ganga\b/.test(n);
+    };
+    const beforeFilter = aiResult.recommendations.length;
+    aiResult.recommendations = aiResult.recommendations.filter(r => !isCatalogPlaceholder(r.name));
+    const dropped = beforeFilter - aiResult.recommendations.length;
+    if (dropped > 0) {
+      console.log(`  [recs] Filtered out ${dropped} catalog-placeholder item(s)`);
+    }
+    if (aiResult.recommendations.length === 0) {
+      return res.status(503).json({
+        success: false,
+        error: 'AI engine returned only catalog-placeholder products. Please retry.',
         timestamp: new Date().toISOString()
       });
     }

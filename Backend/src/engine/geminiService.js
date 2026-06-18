@@ -277,7 +277,7 @@ INSTRUCTIONS:
 10. Set financialStatusAlert if total cost seems too high for the facility size/budget
 11. Ensure grossAggregatedCost equals the sum of all calculated_cost values
 
-For each product: productId (e.g. REC-001), sku, name (use realistic Indian brands: low budget = local brands; medium = Savo, Vim, Lizol, Domex, Colin; high = Diversey, 3M, SC Johnson), unit_price (Rs per litre), recommended_dilution, estimated_monthly_qty_units, calculated_cost (INR total monthly), coverage_per_unit (sq.ft per litre), usage_guidance, safety_notes
+For each product: productId (e.g. REC-001), sku, name (use realistic Indian market brands: low budget = local brands (e.g. "Savo", "Vim"); medium = established FMCG brands ("Lizol", "Domex", "Colin", "Dettol", "Harpic"); high = institutional/premium ("Diversey Taski", "3M", "SC Johnson", "Ecolab"). Do NOT invent generic catalog-style brand prefixes such as "Ganga …", "Premium …", "Pro …" — every product must be a real, recognised brand name or a descriptive compound like "Heavy Duty Degreaser (concentrate)". Names must read like real Indian cleaning product SKUs, not internal placeholders.), unit_price (Rs per litre), recommended_dilution, estimated_monthly_qty_units, calculated_cost (INR total monthly), coverage_per_unit (sq.ft per litre), usage_guidance, safety_notes
 
 Respond ONLY with valid JSON matching this schema:
 {"recommendations":[{"productId":"","sku":"","name":"","recommended_dilution":"","estimated_monthly_qty_units":0,"calculated_cost":0,"usage_guidance":"","safety_notes":""}],"summary":{"grossAggregatedCost":0,"financialStatusAlert":null}}`;
