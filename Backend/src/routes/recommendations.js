@@ -277,15 +277,35 @@ router.post('/process', validateProcessBody, async (req, res, next) => {
     });
 
     // --- Return response ---
-    const [recommendation, items] = await Promise.all([
+    const [recommendation, dbItems] = await Promise.all([
       queryOne('SELECT * FROM recommendations WHERE id = ?', [recId]),
       queryAll(
-      `SELECT ri.*, p.name as product_name, p.category, p.safety_notes, p.usage_guidance,
-              p.unit, p.coverage_per_unit, p.unit_price as base_price
-       FROM recommendation_items ri
-       LEFT JOIN products p ON ri.product_id = p.id
-       WHERE ri.recommendation_id = ?
-       ORDER BY ri.priority ASC`, [recId    ])]);
+        'SELECT * FROM recommendation_items WHERE recommendation_id = ? ORDER BY priority ASC',
+        [recId]
+      )
+    ]);
+
+    // Fetch product details separately (avoids JOIN — works in in-memory mode)
+    let items = dbItems;
+    if (items.length > 0) {
+      const productIds = [...new Set(items.map(item => item.product_id).filter(Boolean))];
+      const productMap = {};
+      for (const pid of productIds) {
+        const product = await queryOne('SELECT * FROM products WHERE id = ?', [pid]);
+        if (product) productMap[pid] = product;
+      }
+      items = items.map(item => {
+        const product = productMap[item.product_id];
+        return {
+          ...item,
+          product_name: product?.name || 'Unknown Product',
+          category: product?.category || null,
+          unit: product?.unit || 'litre',
+          coverage_per_unit: product?.coverage_per_unit || 0,
+          base_price: product?.unit_price || 0
+        };
+      });
+    }
 
     // If DB items have null product_name (because product_id was a SKU string),
     // fill in from the Gemini output — matched by SKU, not by index
@@ -351,25 +371,46 @@ router.get('/', async (req, res, next) => {
     const { page = 1, limit = 10, status } = req.query;
     const offset = (Number(page) - 1) * Number(limit);
 
-    let sql = `SELECT r.*, i.name as institution_name, i.institution_type
-               FROM recommendations r
-               JOIN institutions i ON r.institution_id = i.id WHERE i.user_id = ?`;
-    const params = [req.user.uid];
+    // Get user's institution IDs first (avoids JOIN)
+    const userInstitutions = await queryAll('SELECT id, name, institution_type FROM institutions WHERE user_id = ?', [req.user.uid]);
+    const userInstIds = userInstitutions.map(i => i.id);
+    const instMap = {};
+    userInstitutions.forEach(i => { instMap[i.id] = { institution_name: i.name, institution_type: i.institution_type }; });
 
-    if (status) { sql += ' AND r.status = ?'; params.push(status); }
+    if (userInstIds.length === 0) {
+      return res.json({
+        success: true,
+        count: 0,
+        total: 0,
+        page: Number(page),
+        totalPages: 0,
+        data: [],
+        timestamp: new Date().toISOString()
+      });
+    }
 
-    const countResult = await queryAll(
-      `SELECT COUNT(*) as total FROM recommendations r
-       JOIN institutions i ON r.institution_id = i.id WHERE i.user_id = ?` + (status ? ' AND r.status = ?' : ''),
-      status ? [req.user.uid, status] : [req.user.uid]
-    );
+    // Build placeholders for IN clause
+    const placeholders = userInstIds.map(() => '?').join(',');
+    const countSql = `SELECT COUNT(*) as total FROM recommendations WHERE institution_id IN (${placeholders})` +
+      (status ? ' AND status = ?' : '');
+    const countParams = status ? [...userInstIds, status] : [...userInstIds];
+    const countResult = await queryAll(countSql, countParams);
     const total = countResult[0]?.total || 0;
 
-    sql += ' ORDER BY r.created_at DESC LIMIT ? OFFSET ?';
-    params.push(Number(limit), offset);
-    const recommendations = await queryAll(sql, params);
+    const dataSql = `SELECT * FROM recommendations WHERE institution_id IN (${placeholders})` +
+      (status ? ' AND status = ?' : '') +
+      ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+    const dataParams = status
+      ? [...userInstIds, status, Number(limit), offset]
+      : [...userInstIds, Number(limit), offset];
+    const recommendations = await queryAll(dataSql, dataParams);
 
-    const parsed = recommendations.map(r => ({ ...r, alerts: safeJsonParse(r.alerts, []) }));
+    // Attach institution name/type from the instMap
+    const parsed = recommendations.map(r => ({
+      ...r,
+      ...(instMap[r.institution_id] || {}),
+      alerts: safeJsonParse(r.alerts, [])
+    }));
 
     res.json({
       success: true,
@@ -390,10 +431,10 @@ router.get('/', async (req, res, next) => {
 // ---------------------------------------------------------------------------
 router.get('/:id', async (req, res, next) => {
   try {
+    // Step 1: Fetch the recommendation by ID (simple query, no JOIN)
     const recommendation = await queryOne(
-      `SELECT r.*, i.name as institution_name, i.institution_type, i.area_size, i.hygiene_standard, i.budget, i.surface_types, i.metadata, i.contact_email, i.contact_name
-       FROM recommendations r JOIN institutions i ON r.institution_id = i.id WHERE r.id = ? AND i.user_id = ?`,
-      [req.params.id, req.user.uid]
+      `SELECT * FROM recommendations WHERE id = ?`,
+      [req.params.id]
     );
 
     if (!recommendation) {
@@ -404,24 +445,58 @@ router.get('/:id', async (req, res, next) => {
       });
     }
 
-    // Parse metadata
-    recommendation.metadata = safeJsonParse(recommendation.metadata, null);
+    // Step 2: Fetch the associated institution to verify ownership AND get institution fields
+    const institution = await queryOne(
+      'SELECT * FROM institutions WHERE id = ? AND user_id = ?',
+      [recommendation.institution_id, req.user.uid]
+    );
 
+    if (!institution) {
+      return res.status(404).json({
+        success: false,
+        error: 'Recommendation not found',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Step 3: Merge institution fields into the recommendation
+    recommendation.institution_name = institution.name;
+    recommendation.institution_type = institution.institution_type;
+    recommendation.area_size = institution.area_size;
+    recommendation.hygiene_standard = institution.hygiene_standard;
+    recommendation.budget = institution.budget;
+    recommendation.surface_types = institution.surface_types;
+    recommendation.metadata = safeJsonParse(institution.metadata, null);
+    recommendation.contact_email = institution.contact_email;
+    recommendation.contact_name = institution.contact_name;
+
+    // Step 4: Fetch recommendation items (with product data via separate queries if needed)
     let items = await queryAll(
-      `SELECT ri.*, p.name as product_name, p.category, p.safety_notes, p.usage_guidance,
-              p.unit, p.coverage_per_unit, p.unit_price as base_price
-       FROM recommendation_items ri
-       LEFT JOIN products p ON ri.product_id = p.id
-       WHERE ri.recommendation_id = ? ORDER BY ri.priority ASC`,
+      'SELECT * FROM recommendation_items WHERE recommendation_id = ? ORDER BY priority ASC',
       [req.params.id]
     );
 
-    // Fill in missing product names for edge cases
+    // Fetch product details separately for each item (avoids JOIN)
     if (items.length > 0) {
-      items = items.map(item => ({
-        ...item,
-        product_name: item.product_name || 'Unknown Product'
-      }));
+      const productIds = [...new Set(items.map(item => item.product_id).filter(Boolean))];
+      const productMap = {};
+      for (const pid of productIds) {
+        const product = await queryOne('SELECT * FROM products WHERE id = ?', [pid]);
+        if (product) productMap[pid] = product;
+      }
+      items = items.map(item => {
+        const product = productMap[item.product_id];
+        return {
+          ...item,
+          product_name: product?.name || 'Unknown Product',
+          category: product?.category || null,
+          safety_notes: item.safety_notes || product?.safety_notes || null,
+          usage_guidance: item.usage_guidance || product?.usage_guidance || null,
+          unit: product?.unit || 'litre',
+          coverage_per_unit: product?.coverage_per_unit || 0,
+          base_price: product?.unit_price || 0
+        };
+      });
     }
 
     res.json({
