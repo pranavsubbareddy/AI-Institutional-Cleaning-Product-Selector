@@ -10,23 +10,86 @@ let pool = null;
 // (deployed with the code) so the main account never gets lost.
 // ─────────────────────────────────────────────────────────────────────────
 const memoryTables = {};
+let saveTimer = null;
+let savePending = false;
 
-// Load pre-seeded user data from data.json (if available)
-function seedUsersFromDisk() {
-  const dataFile = path.join(__dirname, '..', '..', '..', 'data.json');
-  try {
-    if (fs.existsSync(dataFile)) {
-      const raw = fs.readFileSync(dataFile, 'utf-8');
-      const data = JSON.parse(raw);
-      if (data.USERS && data.USERS.length > 0) {
-        const users = memTable('users');
-        data.USERS.forEach(u => users.push(u));
-        console.log('  Loaded ' + data.USERS.length + ' pre-seeded user(s) from data.json');
+// Resolve the data.json path — try project root first, then /tmp for Vercel
+function getDataFilePath() {
+  return path.join(__dirname, '..', '..', '..', 'data.json');
+}
+function getTempDataFilePath() {
+  return path.join('/tmp', 'data.json');
+}
+
+// Load ALL pre-seeded data from data.json (if available)
+function seedFromDisk() {
+  // Try /tmp/data.json first (Vercel warm instance with persisted data), then project-root data.json (seed)
+  const candidates = [getTempDataFilePath(), getDataFilePath()];
+  for (const dataFile of candidates) {
+    try {
+      if (fs.existsSync(dataFile)) {
+        const raw = fs.readFileSync(dataFile, 'utf-8');
+        const data = JSON.parse(raw);
+        const tableMap = {
+          INST: 'institutions',
+          RECS: 'recommendations',
+          ITEMS: 'recommendation_items',
+          USERS: 'users',
+          PRODUCTS: 'products'
+        };
+        let totalLoaded = 0;
+        for (const [key, tableName] of Object.entries(tableMap)) {
+          if (data[key] && data[key].length > 0) {
+            const table = memTable(tableName);
+            data[key].forEach(row => table.push(row));
+            totalLoaded += data[key].length;
+            console.log(`  Loaded ${data[key].length} record(s) into "${tableName}" from ${dataFile}`);
+          }
+        }
+        if (totalLoaded > 0) {
+          console.log(`  Total: ${totalLoaded} records loaded from disk into in-memory engine`);
+        }
+        return; // Successfully loaded from first candidate
       }
+    } catch (err) {
+      console.warn(`  Could not load from ${dataFile}: ${err.message}`);
     }
-  } catch (err) {
-    console.warn('  Could not load users from data.json:', err.message);
   }
+}
+
+// Save ALL memory tables back to data.json (debounced)
+// On Vercel (read-only project filesystem), falls back to /tmp/data.json
+function saveToDisk() {
+  if (savePending) return;
+  savePending = true;
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    savePending = false;
+    saveTimer = null;
+    try {
+      const data = {
+        INST: memTable('institutions'),
+        RECS: memTable('recommendations'),
+        ITEMS: memTable('recommendation_items'),
+        USERS: memTable('users'),
+        PRODUCTS: memTable('products')
+      };
+      const json = JSON.stringify(data, null, 2);
+      // Try data.json in project root first
+      try {
+        fs.writeFileSync(getDataFilePath(), json, 'utf-8');
+      } catch (writeErr) {
+        // Project root may be read-only (Vercel) — try /tmp/data.json
+        try {
+          fs.writeFileSync(getTempDataFilePath(), json, 'utf-8');
+        } catch (tmpErr) {
+          console.warn('  [memSQL] Could not persist data to disk (both locations failed):', tmpErr.message);
+        }
+      }
+    } catch (err) {
+      console.warn('  [memSQL] Failed to serialize memory tables:', err.message);
+    }
+  }, 500);
 }
 
 function memTable(name) {
@@ -202,6 +265,7 @@ function memQueryAll(sql, params) {
       const row = {};
       columns.forEach((col, i) => { row[col] = params[i] !== undefined ? params[i] : null; });
       memTable(tableName).push(row);
+      saveToDisk();
       return { affectedRows: 1 };
     }
 
@@ -253,6 +317,7 @@ function memQueryAll(sql, params) {
           count++;
         }
       });
+      if (count > 0) saveToDisk();
       return { affectedRows: count };
     }
 
@@ -265,7 +330,9 @@ function memQueryAll(sql, params) {
       const table = memTable(tableName);
       const before = table.length;
       memoryTables[tableName] = table.filter(row => !memRowMatches(row, whereClause, params));
-      return { affectedRows: before - (memoryTables[tableName] || []).length };
+      const affected = before - (memoryTables[tableName] || []).length;
+      if (affected > 0) saveToDisk();
+      return { affectedRows: affected };
     }
   } catch (err) {
     console.error('[memSQL] Error executing in-memory query:', err.message);
@@ -325,7 +392,7 @@ async function initializeSchema() {
     console.log(' No database configured. Running in memory-only mode. Set DATABASE_URL for persistent storage.');
     // pool stays null; queryAll/queryOne/run will use the in-memory engine
     // Load pre-seeded users from data.json so main account survives cold starts
-    seedUsersFromDisk();
+    seedFromDisk();
     return null;
   }
 
