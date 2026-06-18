@@ -46,6 +46,28 @@ function seedFromDisk() {
             console.log(`  Loaded ${data[key].length} record(s) into "${tableName}" from ${dataFile}`);
           }
         }
+        // Backfill user_id on rows that pre-date multi-tenant ownership. If we
+        // have any users in the seed, attribute orphan rows to the first user
+        // so per-user DELETE / SELECT scoping works correctly.
+        try {
+          const users = memoryTables.users || [];
+          const ownerUid = users.length > 0 ? users[0].uid : null;
+          if (ownerUid) {
+            const instTable = memoryTables.institutions || [];
+            let backfilled = 0;
+            instTable.forEach(row => {
+              if (row.user_id === undefined || row.user_id === null || row.user_id === '') {
+                row.user_id = ownerUid;
+                backfilled++;
+              }
+            });
+            if (backfilled > 0) {
+              console.log(`  Backfilled user_id on ${backfilled} orphan institution row(s) -> ${ownerUid}`);
+            }
+          }
+        } catch (bfErr) {
+          console.warn('  user_id backfill skipped:', bfErr.message);
+        }
         if (totalLoaded > 0) {
           console.log(`  Total: ${totalLoaded} records loaded from disk into in-memory engine`);
         }
@@ -54,6 +76,63 @@ function seedFromDisk() {
     } catch (err) {
       console.warn(`  Could not load from ${dataFile}: ${err.message}`);
     }
+  }
+}
+
+// Reload tables from disk into memory (overwriting any in-memory state).
+// Required on serverless platforms where each invocation may be a different
+// instance — without this, a POST handled by instance A is invisible to a GET
+// handled by instance B because /tmp/data.json was written by A but never
+// re-read by B. Call before every query to keep cross-instance state coherent.
+let diskMtimeMs = 0;
+function reloadFromDiskIfChanged() {
+  if (pool) return; // MySQL mode — disk reload is unnecessary
+  try {
+    const tmpPath = getTempDataFilePath();
+    const rootPath = getDataFilePath();
+    let chosenPath = null;
+    let mtime = 0;
+    try {
+      const s1 = fs.statSync(tmpPath);
+      mtime = s1.mtimeMs;
+      chosenPath = tmpPath;
+    } catch { /* /tmp not present */ }
+    try {
+      const s2 = fs.statSync(rootPath);
+      if (s2.mtimeMs > mtime) { mtime = s2.mtimeMs; chosenPath = rootPath; }
+    } catch { /* project root not present */ }
+    if (!chosenPath) return;
+    if (mtime <= diskMtimeMs) return; // no change
+    diskMtimeMs = mtime;
+    const raw = fs.readFileSync(chosenPath, 'utf-8');
+    const data = JSON.parse(raw);
+    const tableMap = {
+      INST: 'institutions',
+      RECS: 'recommendations',
+      ITEMS: 'recommendation_items',
+      USERS: 'users',
+      PRODUCTS: 'products'
+    };
+    for (const [key, tableName] of Object.entries(tableMap)) {
+      memoryTables[tableName] = Array.isArray(data[key]) ? data[key].slice() : [];
+    }
+    // Backfill user_id on orphan institution rows so per-user scoping works.
+    const users = memoryTables.users || [];
+    const ownerUid = users.length > 0 ? users[0].uid : null;
+    if (ownerUid) {
+      let backfilled = 0;
+      (memoryTables.institutions || []).forEach(row => {
+        if (row.user_id === undefined || row.user_id === null || row.user_id === '') {
+          row.user_id = ownerUid;
+          backfilled++;
+        }
+      });
+      if (backfilled > 0) {
+        console.log(`  [reload] Backfilled user_id on ${backfilled} orphan institution row(s)`);
+      }
+    }
+  } catch (err) {
+    // Best-effort — fall through to in-memory state
   }
 }
 
@@ -66,30 +145,35 @@ function saveToDisk() {
   saveTimer = setTimeout(() => {
     savePending = false;
     saveTimer = null;
-    try {
-      const data = {
-        INST: memTable('institutions'),
-        RECS: memTable('recommendations'),
-        ITEMS: memTable('recommendation_items'),
-        USERS: memTable('users'),
-        PRODUCTS: memTable('products')
-      };
-      const json = JSON.stringify(data, null, 2);
-      // Try data.json in project root first
-      try {
-        fs.writeFileSync(getDataFilePath(), json, 'utf-8');
-      } catch (writeErr) {
-        // Project root may be read-only (Vercel) — try /tmp/data.json
-        try {
-          fs.writeFileSync(getTempDataFilePath(), json, 'utf-8');
-        } catch (tmpErr) {
-          console.warn('  [memSQL] Could not persist data to disk (both locations failed):', tmpErr.message);
-        }
-      }
-    } catch (err) {
-      console.warn('  [memSQL] Failed to serialize memory tables:', err.message);
-    }
+    flushMemoryToDisk();
   }, 500);
+}
+
+// Synchronously write the current in-memory state to disk. Used after writes
+// that must be visible to other serverless invocations before the response
+// returns — debounced saves can land after the function has been recycled.
+function flushMemoryToDisk() {
+  try {
+    const data = {
+      INST: memTable('institutions'),
+      RECS: memTable('recommendations'),
+      ITEMS: memTable('recommendation_items'),
+      USERS: memTable('users'),
+      PRODUCTS: memTable('products')
+    };
+    const json = JSON.stringify(data, null, 2);
+    try {
+      fs.writeFileSync(getDataFilePath(), json, 'utf-8');
+    } catch (writeErr) {
+      try {
+        fs.writeFileSync(getTempDataFilePath(), json, 'utf-8');
+      } catch (tmpErr) {
+        console.warn('  [memSQL] Could not persist data to disk (both locations failed):', tmpErr.message);
+      }
+    }
+  } catch (err) {
+    console.warn('  [memSQL] Failed to serialize memory tables:', err.message);
+  }
 }
 
 function memTable(name) {
@@ -128,6 +212,16 @@ function tokenize(sql) {
   return tokens;
 }
 
+// Detect whether position i starts a top-level keyword (AND/OR) by checking
+// that the previous character is a token boundary (whitespace, paren, comma,
+// or the start of the clause). This allows e.g. "? AND" or "(col = ?) AND".
+function isKeywordStart(clause, i, keyword) {
+  if (clause.substring(i, i + keyword.length).toUpperCase() !== keyword) return false;
+  if (i === 0) return true;
+  const prev = clause[i - 1];
+  return /\s/.test(prev) || prev === '(' || prev === ',' || prev === '?';
+}
+
 // Split WHERE clause by top-level OR (not inside parentheses)
 function splitOr(where) {
   const parts = [];
@@ -136,7 +230,7 @@ function splitOr(where) {
   for (let i = 0; i < where.length; i++) {
     if (where[i] === '(') depth++;
     else if (where[i] === ')') depth--;
-    else if (depth === 0 && where.substring(i, i + 3).toUpperCase() === ' OR' && (i === 0 || /\s/.test(where[i - 1]))) {
+    else if (depth === 0 && isKeywordStart(where, i, ' OR')) {
       parts.push(where.substring(start, i).trim());
       i += 2;
       start = i + 1;
@@ -154,7 +248,7 @@ function splitAnd(clause) {
   for (let i = 0; i < clause.length; i++) {
     if (clause[i] === '(') depth++;
     else if (clause[i] === ')') depth--;
-    else if (depth === 0 && clause.substring(i, i + 4).toUpperCase() === ' AND' && (i === 0 || /\s/.test(clause[i - 1]))) {
+    else if (depth === 0 && isKeywordStart(clause, i, ' AND')) {
       parts.push(clause.substring(start, i).trim());
       i += 3;
       start = i + 1;
@@ -265,7 +359,7 @@ function memQueryAll(sql, params) {
       const row = {};
       columns.forEach((col, i) => { row[col] = params[i] !== undefined ? params[i] : null; });
       memTable(tableName).push(row);
-      saveToDisk();
+      flushMemoryToDisk();
       return { affectedRows: 1 };
     }
 
@@ -317,7 +411,7 @@ function memQueryAll(sql, params) {
           count++;
         }
       });
-      if (count > 0) saveToDisk();
+      if (count > 0) flushMemoryToDisk();
       return { affectedRows: count };
     }
 
@@ -331,7 +425,7 @@ function memQueryAll(sql, params) {
       const before = table.length;
       memoryTables[tableName] = table.filter(row => !memRowMatches(row, whereClause, params));
       const affected = before - (memoryTables[tableName] || []).length;
-      if (affected > 0) saveToDisk();
+      if (affected > 0) flushMemoryToDisk();
       return { affectedRows: affected };
     }
   } catch (err) {
@@ -723,6 +817,7 @@ async function initializeSchema() {
 
 async function queryAll(sql, params = []) {
   if (!pool) {
+    reloadFromDiskIfChanged();
     return memQueryAll(sql, params);
   }
   const p = getPool();
@@ -738,6 +833,7 @@ async function queryOne(sql, params = []) {
 
 async function run(sql, params = []) {
   if (!pool) {
+    reloadFromDiskIfChanged();
     return memQueryAll(sql, params);
   }
   const p = getPool();
