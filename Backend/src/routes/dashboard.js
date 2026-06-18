@@ -121,23 +121,48 @@ router.get('/institutions', async (req, res, next) => {
   try {
     const uid = req.user.uid;
 
+    // Step 1: Fetch all institutions for this user (simple query, no JOINs/subqueries)
     const institutions = await queryAll(
-      `SELECT i.*,
-              (SELECT COUNT(*) FROM recommendations WHERE institution_id = i.id) as recommendation_count,
-              (SELECT total_estimated_cost FROM recommendations WHERE institution_id = i.id ORDER BY created_at DESC LIMIT 1) as latest_cost,
-              (SELECT status FROM recommendations WHERE institution_id = i.id ORDER BY created_at DESC LIMIT 1) as latest_status,
-              (SELECT created_at FROM recommendations WHERE institution_id = i.id ORDER BY created_at DESC LIMIT 1) as latest_recommendation_date
-       FROM institutions i
-       WHERE i.user_id = ?
-       ORDER BY i.created_at DESC`,
+      `SELECT * FROM institutions WHERE user_id = ? ORDER BY created_at DESC`,
       [uid]
     );
 
-    const parsed = institutions.map(inst => ({
-      ...inst,
-      surface_types: safeJsonParse(inst.surface_types, []),
-      metadata: safeJsonParse(inst.metadata, null)
-    }));
+    // Step 2: Fetch recommendations for these institutions and build a lookup map
+    const instIds = institutions.map(i => i.id);
+    let recommendationsMap = {};
+    if (instIds.length > 0) {
+      const placeholders = instIds.map(() => '?').join(',');
+      const recs = await queryAll(
+        `SELECT * FROM recommendations WHERE institution_id IN (${placeholders}) ORDER BY created_at DESC`,
+        instIds
+      );
+      // Group by institution_id and compute count + pick latest by created_at
+      recs.forEach(rec => {
+        if (!recommendationsMap[rec.institution_id]) {
+          recommendationsMap[rec.institution_id] = { count: 0, latest: null };
+        }
+        recommendationsMap[rec.institution_id].count++;
+        // Track the latest by comparing created_at (order-independent)
+        const existing = recommendationsMap[rec.institution_id].latest;
+        if (!existing || (rec.created_at && existing.created_at && rec.created_at > existing.created_at)) {
+          recommendationsMap[rec.institution_id].latest = rec;
+        }
+      });
+    }
+
+    // Step 3: Merge recommendation data into each institution
+    const parsed = institutions.map(inst => {
+      const recData = recommendationsMap[inst.id] || { count: 0, latest: null };
+      return {
+        ...inst,
+        recommendation_count: recData.count,
+        latest_cost: recData.latest?.total_estimated_cost || null,
+        latest_status: recData.latest?.status || null,
+        latest_recommendation_date: recData.latest?.created_at || null,
+        surface_types: safeJsonParse(inst.surface_types, []),
+        metadata: safeJsonParse(inst.metadata, null)
+      };
+    });
 
     res.json({
       success: true,
