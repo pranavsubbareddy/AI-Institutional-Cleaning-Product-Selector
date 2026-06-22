@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { queryAll, safeJsonParse } = require('../database/schema');
+const { queryAll, queryOne, safeJsonParse } = require('../database/schema');
 const { requireAuth } = require('../middleware/auth');
 
 // All dashboard routes require authentication
