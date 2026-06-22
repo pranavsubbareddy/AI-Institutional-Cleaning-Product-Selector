@@ -9,6 +9,7 @@ const { queryOne, run } = require('../database/schema');
 const {
   sendVerificationEmail,
   sendWelcomeEmail,
+  sendSignupConfirmationEmail,
   sendPasswordResetEmail,
   sendLoginNotificationEmail,
   sendGoogleWelcomeEmail,
@@ -54,17 +55,42 @@ router.post('/signup', async (req, res, next) => {
 
     const normalizedEmail = email.toLowerCase().trim();
 
-    // Check for existing user
-    const existing = await queryOne('SELECT uid FROM users WHERE email = ?', [normalizedEmail]).catch(() => null);
+    // Check for existing user — if found, reclaim the account instead of creating a duplicate.
+    // This ensures the new user is linked to the same uid and therefore to the existing
+    // institutions / recommendations tied to that uid (e.g. seed data from data.json).
+    const existing = await queryOne('SELECT * FROM users WHERE email = ?', [normalizedEmail]).catch(() => null);
     if (existing) {
-      return res.status(409).json({ success: false, error: 'An account with this email already exists', timestamp: new Date().toISOString() });
+      // Update the existing user's password and display name
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const displayNameTrimmed = displayName.trim();
+      await run(
+        'UPDATE users SET passwordHash = ?, displayName = ?, phone = ?, age = ?, gender = ? WHERE email = ?',
+        [hashedPassword, displayNameTrimmed, phone || '', age ? Number(age) : null, gender || '', normalizedEmail]
+      ).catch(() => {});
+
+      // Generate token for the existing user (their uid stays the same, so institutions stay linked)
+      const user = stripPassword(existing);
+      user.displayName = displayNameTrimmed;
+      user.phone = phone || '';
+      user.age = age ? Number(age) : null;
+      user.gender = gender || '';
+
+      const token = generateToken(user);
+      res.cookie('token', token, COOKIE_OPTIONS);
+
+      return res.json({
+        success: true,
+        message: 'Welcome back! Your account has been linked to your existing facilities.',
+        data: { ...user, emailVerified: !!user.emailVerified },
+        timestamp: new Date().toISOString()
+      });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const uid = 'user_' + uuidv4();
     const createdAt = new Date().toISOString();
     const verificationToken = generateRandomToken();
-    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
     // Insert user as unverified
     await run(
@@ -84,7 +110,8 @@ router.post('/signup', async (req, res, next) => {
     const token = generateToken(user);
     res.cookie('token', token, COOKIE_OPTIONS);
 
-    // Send verification email (fire-and-forget)
+    // Send confirmation & verification emails (fire-and-forget)
+    sendSignupConfirmationEmail(normalizedEmail, displayName.trim());
     sendVerificationEmail(normalizedEmail, displayName.trim(), verificationToken);
 
     res.status(201).json({
@@ -294,7 +321,7 @@ router.post('/resend-verification', async (req, res) => {
     }
 
     const verificationToken = generateRandomToken();
-    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
     await run(
       'UPDATE users SET emailVerificationToken = ?, emailVerificationExpires = ? WHERE uid = ?',
@@ -392,7 +419,8 @@ router.post('/forgot-password', async (req, res) => {
     }
 
     const resetToken = generateRandomToken();
-    const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    // Use ISO string for consistent timezone handling across MySQL and JS
+    const resetExpires = new Date(Date.now() + 60 * 60 * 1000).toISOString();
 
     await run(
       'UPDATE users SET resetPasswordToken = ?, resetPasswordExpires = ? WHERE email = ?',

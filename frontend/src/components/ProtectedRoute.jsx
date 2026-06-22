@@ -23,7 +23,7 @@ const PUBLIC_AUTH_ROUTES = [
 const ROLE_ROUTES = {
   // Super Admin - full access
   admin: [
-    '/admin-portal', '/admin',
+    '/admin-portal', '/admin', '/warehouse', '/deliveries', '/salesman', '/compliance'
   ],
   // Sales Admin - CRM, customers, leads, quotations, sales reports
   sales_admin: [

@@ -9,16 +9,14 @@ const RecommendationSchema = z.object({
         productId: z.string().describe('Unique product ID (generate your own, e.g., AI-PROD-001)'),
         sku: z.string().describe('Product SKU code (generate your own)'),
         name: z.string().describe('Real institutional cleaning product name with brand'),
-        unit_price: z.number().describe('Unit price per litre or per unit in INR (e.g., 250 for Rs 250/litre)'),
         recommended_dilution: z.string().describe('Dilution ratio or "Ready to use"'),
         estimated_monthly_qty_units: z.number().describe('Estimated monthly quantity in units'),
-        calculated_cost: z.number().describe('Calculated monthly cost in INR = unit_price × estimated_monthly_qty_units'),
-        coverage_per_unit: z.number().describe('Coverage area per unit in square feet (e.g., 500 for 500 sq.ft per litre)'),
+        calculated_cost: z.number().describe('Calculated monthly cost in INR'),
         usage_guidance: z.string().describe('How to use the product'),
         safety_notes: z.string().describe('Safety precautions'),
       })
     )
-    .describe('Array of recommended products — recommend the right number of products (typically 4-10 depending on facility complexity and needs)'),
+    .describe('Array of recommended products — recommend 4-10 most relevant products'),
   summary: z.object({
     grossAggregatedCost: z.number().describe('Total monthly cost of all recommended products in INR'),
     financialStatusAlert: z.string().nullable().describe('Budget/financial alert message or null'),
@@ -245,39 +243,16 @@ function buildPrompt(params, catalog) {
   const hygiene = params.hygiene_standard || 'Standard';
   const budget = params.budget || 'Medium';
   const instType = params.institution_type || 'Facility';
-  const occupants = meta.occupants || 'Unknown';
-  const floors = meta.floors || 1;
-  const frequency = meta.cleaning_frequency || 'daily';
-  const preferences = (meta.preferences || []).join(', ') || 'None';
 
-  return `You are a cleaning product procurement expert for India. Recommend cleaning products for this specific facility.
+  return `You are a cleaning product procurement expert. Recommend 4-10 distinct cleaning products for this Indian facility.
 
-FACILITY DETAILS:
-- Type: ${instType}
-- Area: ${area}
-- Surfaces to clean: ${surfaces}
-- Hygiene standard required: ${hygiene}
-- Budget level: ${budget}
-- Occupants: ${occupants}
-- Floors: ${floors}
-- Cleaning frequency: ${frequency}
-- Available equipment: ${equipment}
-- Product preferences: ${preferences}
+TYPE: ${instType}
+AREA: ${area}
+SURFACES: ${surfaces}
+HYGIENE: ${hygiene}
+BUDGET: ${budget}
 
-INSTRUCTIONS:
-1. Recommend an appropriate number of products based on the facility's needs (typically 4-10 products depending on size, surface types, and complexity)
-2. Products MUST match the specific surfaces listed above — recommend at least one product for each surface type
-3. Match products to the institution type (e.g., hospital needs disinfectants, school needs general cleaners, restaurant needs degreasers)
-4. Price products according to the budget level: low = economical brands (₹100-300/unit), medium = standard brands (₹150-500/unit), high = premium brands (₹300-800/unit)
-5. Calculate quantities based on area size — larger areas need more quantity
-6. Do NOT just recommend top brands — choose products that are appropriate for this specific facility's requirements and budget
-7. Set unit_price as the price per litre/unit in INR (e.g., 250 for Rs 250/litre)
-8. Set calculated_cost as (estimated_monthly_qty_units × unit_price) — these MUST be consistent
-9. Set coverage_per_unit as the area in square feet that one unit covers (e.g., 500 for a litre)
-10. Set financialStatusAlert if total cost seems too high for the facility size/budget
-11. Ensure grossAggregatedCost equals the sum of all calculated_cost values
-
-For each product: productId (e.g. REC-001), sku, name (use realistic Indian market brands: low budget = local brands (e.g. "Savo", "Vim"); medium = established FMCG brands ("Lizol", "Domex", "Colin", "Dettol", "Harpic"); high = institutional/premium ("Diversey Taski", "3M", "SC Johnson", "Ecolab"). Do NOT invent generic catalog-style brand prefixes such as "Ganga …", "Premium …", "Pro …" — every product must be a real, recognised brand name or a descriptive compound like "Heavy Duty Degreaser (concentrate)". Names must read like real Indian cleaning product SKUs, not internal placeholders.), unit_price (Rs per litre), recommended_dilution, estimated_monthly_qty_units, calculated_cost (INR total monthly), coverage_per_unit (sq.ft per litre), usage_guidance, safety_notes
+For each: productId (e.g. REC-001), sku, name (use real Indian brands like Diversey, Savo, Vim, Lizol, Domex, Colin), recommended_dilution, estimated_monthly_qty_units, calculated_cost (INR), usage_guidance, safety_notes
 
 Respond ONLY with valid JSON matching this schema:
 {"recommendations":[{"productId":"","sku":"","name":"","recommended_dilution":"","estimated_monthly_qty_units":0,"calculated_cost":0,"usage_guidance":"","safety_notes":""}],"summary":{"grossAggregatedCost":0,"financialStatusAlert":null}}`;

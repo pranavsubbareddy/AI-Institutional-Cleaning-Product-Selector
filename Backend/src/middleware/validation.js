@@ -10,14 +10,14 @@ function validateInstitutionInput(req, res, next) {
     errors.push('Area size must be a positive number');
   }
 
-  const validSurfaces = ['hard_floor', 'carpet', 'glass', 'tile', 'stainless_steel', 'wood', 'marble', 'countertop', 'porcelain', 'mirror', 'drain', 'air'];
   if (!surface_types || !Array.isArray(surface_types) || surface_types.length === 0) {
     errors.push('At least one surface type is required');
   } else {
-    const invalidSurfaces = surface_types.filter(s => !validSurfaces.includes(s));
-    if (invalidSurfaces.length > 0) {
-      errors.push(`Invalid surface types: ${invalidSurfaces.join(', ')}. Valid: ${validSurfaces.join(', ')}`);
-    }
+    surface_types.forEach(s => {
+      if (typeof s !== 'string' || s.trim().length === 0) {
+        errors.push('Each surface type must be a non-empty string');
+      }
+    });
   }
 
   const validHygiene = ['basic', 'standard', 'high', 'medical_grade'];
@@ -30,9 +30,8 @@ function validateInstitutionInput(req, res, next) {
     errors.push(`Budget must be one of: ${validBudgets.join(', ')}`);
   }
 
-  const validTypes = ['hospital', 'school', 'hotel', 'office', 'restaurant', 'factory', 'warehouse', 'retail', 'gym', 'laboratory', 'pharmacy', 'airport', 'shopping_mall', 'cinema', 'library', 'community_center'];
-  if (!institution_type || typeof institution_type !== 'string' || !validTypes.includes(institution_type)) {
-    errors.push(`Institution type must be one of: ${validTypes.join(', ')}`);
+  if (!institution_type || typeof institution_type !== 'string' || institution_type.trim().length < 2) {
+    errors.push('Institution type is required (min 2 characters)');
   }
 
   if (errors.length > 0) {

@@ -94,13 +94,13 @@ export default function UserRoleManagement() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <button
-            onClick={() => navigate('/admin')}
-            className="flex items-center gap-1.5 text-sm text-surface-400 hover:text-surface-200 transition-colors mb-2"
+            onClick={() => navigate('/admin-portal')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 text-xs font-medium hover:bg-amber-500/20 transition-all"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            Back to Admin
+            Back to Admin Portal
           </button>
           <h1 className="text-2xl font-bold text-surface-100">User Role Management</h1>
           <p className="text-sm text-surface-400 mt-1">

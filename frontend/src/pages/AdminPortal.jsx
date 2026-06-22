@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, formatCurrency } from '../services/api';
 import LoadingState from '../components/LoadingState';
@@ -38,12 +38,52 @@ const ROLE_TEXT_CLASSES = {
   rose: 'text-rose-400',
 };
 
+// ── Toast notification component ─────────────────────────────────────
+function Toast({ message, type, onClose, onUndo, canUndo }) {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 5000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  const colors = type === 'success'
+    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+    : 'bg-red-500/15 border-red-500/30 text-red-400';
+  const iconPath = type === 'success'
+    ? 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'
+    : 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z';
+
+  return (
+    <div className={"fixed bottom-6 right-6 z-[100] flex items-center gap-2.5 px-4 py-3 rounded-xl border shadow-lg shadow-black/20 backdrop-blur-sm animate-slide-up " + colors}>
+      <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={iconPath} />
+      </svg>
+      <span className="text-sm font-medium">{message}</span>
+      {canUndo && onUndo && (
+        <button
+          onClick={onUndo}
+          className="ml-2 px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-white/10 hover:bg-white/20 transition-all uppercase tracking-wider"
+        >
+          Undo
+        </button>
+      )}
+      <button onClick={onClose} className="ml-1 opacity-60 hover:opacity-100 transition-opacity">
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
 export default function AdminPortal() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [dashboardData, setDashboardData] = useState(null);
   const [actionLog, setActionLog] = useState([]);
+  const [toast, setToast] = useState(null); // { message, type: 'success'|'error', undo?: { id, previousStatus } }
+  const [undoStack, setUndoStack] = useState([]);
+  const toastTimerRef = useRef(null);
 
   const currentRole = ROLE_VIEWS[0];
 
@@ -59,43 +99,114 @@ export default function AdminPortal() {
   const fetchAllData = async () => {
     try {
       setLoading(true);
-      const [statsRes, recRes] = await Promise.allSettled([
-        api.getDashboardStats(),
-        api.getRecommendations({ limit: 50 }),
+      const [adminRes] = await Promise.allSettled([
+        api.getAdminDashboard(),
       ]);
 
-      const stats = statsRes.status === 'fulfilled' ? statsRes.value.data : null;
-      const recommendations = recRes.status === 'fulfilled' ? (recRes.value.data || []) : [];
+      const adminData = adminRes.status === 'fulfilled' ? adminRes.value.data : null;
+      setDashboardData(adminData);
 
-      setDashboardData(stats);
-
-      const logs = (recommendations || []).map(rec => {
-        const cost = rec.total_estimated_cost || 0;
+      const recentActivity = adminData?.recent_activity || [];
+      const logs = recentActivity.map(event => {
+        let cost = event.type === 'recommendation' ? (event.total_estimated_cost || 0) : 0;
         let priority = 'Low';
         if (cost > 200000) priority = 'Critical';
         else if (cost > 100000) priority = 'High';
         else if (cost > 50000) priority = 'Medium';
-        const status = (rec.status === 'Processed') ? 'New' : (rec.status || 'New');
+        // Use actual status from the event if available, otherwise derive from type
+        let status = event.status || 'New';
+        if (event.type === 'institution' && !event.status) status = 'New';
         return {
-          id: rec.id,
-          institution_name: rec.institution_name,
-          institution_type: rec.institution_type,
+          id: event.id,
+          institution_name: event.type === 'recommendation'
+            ? event.institution_name || (event.summary || '').split(' - ')[0] || 'Unknown'
+            : event.summary || 'Unknown',
+          institution_type: event.institution_type || '',
           total_estimated_cost: cost,
           status,
           priority,
-          created_at: rec.created_at,
-          summary: rec.summary,
+          created_at: event.timestamp,
+          summary: event.summary,
           actionLog: [
-            { action: 'Recommendation processed by AI Engine', timestamp: rec.processed_at || rec.created_at, user: 'AI System' },
-            { action: 'Assigned for review', timestamp: rec.created_at, user: 'system' },
+            { action: event.action, timestamp: event.timestamp, user: event.user || 'System' },
           ]
         };
       });
       setActionLog(logs);
+
+      // Initialize undo stack
+      setUndoStack([]);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ── Toast helpers ────────────────────────────────────────────────
+  const showToast = useCallback((message, type = 'success', undoEntry = null) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ message, type, undo: undoEntry });
+    toastTimerRef.current = setTimeout(() => setToast(null), 5000);
+  }, []);
+
+  const dismissToast = useCallback(() => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast(null);
+  }, []);
+
+  // ── Handle status update ─────────────────────────────────────────
+  const handleUpdateStatus = async (id, newStatus, previousStatus) => {
+    try {
+      // Extract the real recommendation ID from the prefixed ID (e.g. "rec_...")
+      const recId = id.replace(/^rec_/, '');
+      const res = await api.updateRecommendationStatus(recId, newStatus);
+      if (res.success) {
+        // Store previous state for undo
+        const undoEntry = { id, previousStatus: previousStatus || 'New' };
+        setUndoStack(prev => [undoEntry, ...prev].slice(0, 10)); // Keep max 10 undo entries
+
+        // Update local state to reflect the change immediately
+        setActionLog(prev => prev.map(r => {
+          if (r.id === id) {
+            return { ...r, status: newStatus };
+          }
+          return r;
+        }));
+        showToast('Status updated to ' + newStatus, 'success', undoEntry);
+        // Refresh data to get updated counts
+        fetchAllData();
+      } else {
+        showToast(res.error || 'Failed to update status', 'error');
+      }
+    } catch (err) {
+      console.error('[AdminPortal] Failed to update status:', err.message);
+      showToast('Failed to update status: ' + err.message, 'error');
+    }
+  };
+
+  // ── Handle undo status change ────────────────────────────────────
+  const handleUndoStatus = async (undoEntry) => {
+    if (!undoEntry) return;
+    const { id, previousStatus } = undoEntry;
+    try {
+      const recId = id.replace(/^rec_/, '');
+      const res = await api.updateRecommendationStatus(recId, previousStatus);
+      if (res.success) {
+        setActionLog(prev => prev.map(r => {
+          if (r.id === id) {
+            return { ...r, status: previousStatus };
+          }
+          return r;
+        }));
+        setUndoStack(prev => prev.filter(e => e.id !== id));
+        showToast('Status reverted to ' + previousStatus, 'success');
+        fetchAllData();
+      } else {
+        showToast(res.error || 'Failed to undo', 'error');
+      }
+    } catch (err) {
+      showToast('Failed to undo: ' + err.message, 'error');
     }
   };
 
@@ -193,7 +304,7 @@ export default function AdminPortal() {
             </div>
             <AdminOperationsBoard
               records={actionLog}
-              onUpdateStatus={() => {}}
+              onUpdateStatus={handleUpdateStatus}
               onViewDetail={(id) => navigate('/recommendations/' + id)}
             />
           </div>
@@ -204,6 +315,17 @@ export default function AdminPortal() {
         <div className="mt-6">
           <ActionLog actions={actionLog.slice(0, 10).flatMap(r => r.actionLog || [])} title="Recent Activity" />
         </div>
+      )}
+
+      {/* Toast notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={dismissToast}
+          onUndo={toast.undo ? () => handleUndoStatus(toast.undo) : null}
+          canUndo={!!toast.undo}
+        />
       )}
     </div>
   );

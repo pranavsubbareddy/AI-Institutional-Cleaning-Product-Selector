@@ -53,6 +53,19 @@ app.use('/api/recommendations', recommendationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/admin', adminRoutes);
 
+// ── Operations Routes ───────────────────────────────────────────
+const warehouseRoutes = require('./src/routes/warehouse');
+const deliveryRoutes = require('./src/routes/delivery');
+const salesmanRoutes = require('./src/routes/salesman');
+const complianceRoutes = require('./src/routes/compliance');
+const ordersRoutes = require('./src/routes/orders');
+
+app.use('/api/warehouses', warehouseRoutes);
+app.use('/api/deliveries', deliveryRoutes);
+app.use('/api/salesman', salesmanRoutes);
+app.use('/api/compliance', complianceRoutes);
+app.use('/api/orders', ordersRoutes);
+
 // Root — return a success message so the browser doesn't show a 404
 app.get('/', (req, res) => {
   res.json({success:true,message:'AI Institutional Cleaning Product Selector API',version:'1.0.0',endpoints:['/api/health','/api/products','/api/institutions','/api/recommendations','/api/dashboard','/api/admin'],timestamp:new Date().toISOString()});

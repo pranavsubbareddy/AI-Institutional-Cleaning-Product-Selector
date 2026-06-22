@@ -19,6 +19,14 @@ router.post('/', validateInstitutionInput, async (req, res) => {
     );
 
     const institution = await queryOne('SELECT * FROM institutions WHERE id = ?', [id]);
+    if (!institution) {
+      console.error('[INstitutions POST] INSERT succeeded but SELECT returned no row for id:', id);
+      return res.status(500).json({
+        success: false,
+        error: 'Institution was not created due to a persistence error',
+        timestamp: new Date().toISOString()
+      });
+    }
     institution.surface_types = safeJsonParse(institution.surface_types, []);
     institution.metadata = safeJsonParse(institution.metadata, null);
 
@@ -29,6 +37,8 @@ router.post('/', validateInstitutionInput, async (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
+    console.error('[Institutions POST] Error creating institution:', error.message);
+    console.error('[Institutions POST] Stack:', error.stack);
     res.status(500).json({
       success: false,
       error: 'Failed to create institution',

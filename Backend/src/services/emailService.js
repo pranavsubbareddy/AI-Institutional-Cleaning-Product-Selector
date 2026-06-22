@@ -233,6 +233,58 @@ async function sendLoginNotificationEmail(email, displayName, ip, userAgent, tim
   }
 }
 
+// ── Send Signup Confirmation Email (immediately after account creation) ─
+async function sendSignupConfirmationEmail(email, displayName) {
+  const client = ensureClient();
+  if (!client) return { success: false, skipped: true };
+
+  try {
+    const { data, error } = await client.emails.send({
+      from: `${APP_NAME} <${FROM_EMAIL}>`,
+      to: email,
+      subject: `Account created successfully - ${APP_NAME}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"></head>
+        <body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8fafc;">
+          <div style="max-width:560px;margin:0 auto;padding:24px;">
+            <div style="background:linear-gradient(135deg,#06b6d4,#10b981);padding:32px;border-radius:12px 12px 0 0;text-align:center;">
+              <h1 style="color:#fff;margin:0;font-size:22px;">${APP_NAME}</h1>
+            </div>
+            <div style="background:#fff;padding:32px 24px;border-radius:0 0 12px 12px;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+              <h2 style="color:#1e293b;font-size:20px;margin:0 0 8px;">Welcome ${displayName}!</h2>
+              <p style="color:#475569;font-size:15px;line-height:1.6;margin:0 0 12px;">Your account has been created successfully on <strong>${APP_NAME}</strong>.</p>
+              <p style="color:#475569;font-size:15px;line-height:1.6;margin:0 0 12px;">Please check your inbox for a verification email to verify your email address. Once verified, you can:</p>
+              <ul style="color:#475569;font-size:14px;line-height:1.8;padding-left:20px;margin:0 0 20px;">
+                <li>Get <strong>AI-powered cleaning product recommendations</strong> tailored to your facility</li>
+                <li>Access the <strong>B2B Dashboard</strong> to manage multiple facilities</li>
+                <li>View <strong>detailed quotations & reports</strong> with cost breakdowns</li>
+                <li>Download <strong>PDF reports & share via email</strong></li>
+              </ul>
+              <div style="text-align:center;margin:24px 0;">
+                <a href="${APP_URL}/login" style="display:inline-block;background:linear-gradient(135deg,#06b6d4,#10b981);color:#fff;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:15px;font-weight:600;">Go to Login</a>
+              </div>
+            </div>
+            <p style="text-align:center;color:#94a3b8;font-size:12px;margin-top:16px;">&copy; ${new Date().getFullYear()} Ganga Maxx Marketplace.</p>
+          </div>
+        </body>
+        </html>
+      `,
+    });
+
+    if (error) {
+      console.error('[Email] Signup confirmation email failed:', error);
+      return { success: false, error: error.message };
+    }
+    console.log('[Email] Signup confirmation email sent to', email);
+    return { success: true, id: data?.id };
+  } catch (err) {
+    console.error('[Email] Signup confirmation email error:', err);
+    return { success: false, error: err.message };
+  }
+}
+
 // ── Send Google Welcome Email (after first Google Sign-In) ────────────
 async function sendGoogleWelcomeEmail(email, displayName) {
   const client = ensureClient();
@@ -282,6 +334,7 @@ async function sendGoogleWelcomeEmail(email, displayName) {
 module.exports = {
   sendVerificationEmail,
   sendWelcomeEmail,
+  sendSignupConfirmationEmail,
   sendPasswordResetEmail,
   sendLoginNotificationEmail,
   sendGoogleWelcomeEmail,

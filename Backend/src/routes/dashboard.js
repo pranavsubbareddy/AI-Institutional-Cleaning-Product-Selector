@@ -13,27 +13,41 @@ router.get('/stats', async (req, res, next) => {
   try {
     const uid = req.user.uid;
 
-    const [instCount, recCount, prodCount, ordCount] = await Promise.all([
+    // Get user's institutions first
+    const userInsts = await queryAll('SELECT id FROM institutions WHERE user_id = ?', [uid]);
+    const userInstIds = userInsts.map(i => i.id);
+    const hasInsts = userInstIds.length > 0;
+    const placeholders = hasInsts ? userInstIds.map(() => '?').join(',') : '';
+
+    const [instCount, prodCount, ordCount] = await Promise.all([
       queryAll('SELECT COUNT(*) as count FROM institutions WHERE user_id = ?', [uid]),
-      queryAll('SELECT COUNT(*) as count FROM recommendations r JOIN institutions i ON r.institution_id = i.id WHERE i.user_id = ?', [uid]),
       queryAll('SELECT COUNT(*) as count FROM products'),
       queryAll('SELECT COUNT(*) as count FROM orders')
     ]);
 
-    const [institutionsByType, recommendationsByStatus, costResult, recentRecommendations, hygieneStats, budgetStats, activeRecs] = await Promise.all([
+    // Get rec counts separately using IN clause
+    let recCount = [{ count: 0 }], costResult = [{ total: 0 }], activeRecs = [{ count: 0 }];
+    let recommendationsByStatus = [];
+    let recentRecommendations = [];
+    if (hasInsts) {
+      [recCount, costResult, activeRecs, recommendationsByStatus, recentRecommendations] = await Promise.all([
+        queryAll(`SELECT COUNT(*) as count FROM recommendations WHERE institution_id IN (${placeholders})`, userInstIds),
+        queryAll(`SELECT COALESCE(SUM(total_estimated_cost), 0) as total FROM recommendations WHERE status = 'Processed' AND institution_id IN (${placeholders})`, userInstIds),
+        queryAll(`SELECT COUNT(*) as count FROM recommendations WHERE status IN ('Processed', 'Pending_AI') AND institution_id IN (${placeholders})`, userInstIds),
+        queryAll(`SELECT status, COUNT(*) as count FROM recommendations WHERE institution_id IN (${placeholders}) GROUP BY status`, userInstIds),
+        queryAll(`SELECT id, total_estimated_cost, created_at, status, source, owner, institution_id FROM recommendations WHERE institution_id IN (${placeholders}) ORDER BY created_at DESC LIMIT 10`, userInstIds)
+      ]);
+      // Enrich recentRecommendations with institution names
+      recentRecommendations = await Promise.all((recentRecommendations || []).map(async (rec) => {
+        const inst = await queryOne('SELECT name as institution_name, institution_type FROM institutions WHERE id = ?', [rec.institution_id]);
+        return { ...rec, ...(inst || {}) };
+      }));
+    }
+
+    const [institutionsByType, hygieneStats, budgetStats] = await Promise.all([
       queryAll('SELECT institution_type, COUNT(*) as count FROM institutions WHERE user_id = ? GROUP BY institution_type ORDER BY count DESC', [uid]),
-      queryAll('SELECT r.status, COUNT(*) as count FROM recommendations r JOIN institutions i ON r.institution_id = i.id WHERE i.user_id = ? GROUP BY r.status', [uid]),
-      queryAll("SELECT COALESCE(SUM(r.total_estimated_cost), 0) as total FROM recommendations r JOIN institutions i ON r.institution_id = i.id WHERE r.status = 'Processed' AND i.user_id = ?", [uid]),
-      queryAll(`SELECT r.id, r.total_estimated_cost, r.created_at, r.status, r.source, r.owner,
-              i.name as institution_name, i.institution_type
-       FROM recommendations r
-       JOIN institutions i ON r.institution_id = i.id
-       WHERE i.user_id = ?
-       ORDER BY r.created_at DESC
-       LIMIT 10`, [uid]),
       queryAll('SELECT hygiene_standard, COUNT(*) as count FROM institutions WHERE user_id = ? GROUP BY hygiene_standard', [uid]),
-      queryAll('SELECT budget, COUNT(*) as count FROM institutions WHERE user_id = ? GROUP BY budget', [uid]),
-      queryAll("SELECT COUNT(*) as count FROM recommendations r JOIN institutions i ON r.institution_id = i.id WHERE r.status IN ('Processed', 'Pending_AI') AND i.user_id = ?", [uid])
+      queryAll('SELECT budget, COUNT(*) as count FROM institutions WHERE user_id = ? GROUP BY budget', [uid])
     ]);
 
     const totalEstimatedCost = costResult[0]?.total || 0;
@@ -69,17 +83,28 @@ router.get('/summary', async (req, res, next) => {
   try {
     const uid = req.user.uid;
 
-    const [totalProfiles, volumeResult, activeResult, historyLogs] = await Promise.all([
-      queryAll('SELECT COUNT(*) as count FROM institutions WHERE user_id = ?', [uid]),
-      queryAll("SELECT COALESCE(SUM(r.total_estimated_cost), 0) as total_volume FROM recommendations r JOIN institutions i ON r.institution_id = i.id WHERE r.status = 'Processed' AND i.user_id = ?", [uid]),
-      queryAll("SELECT COUNT(*) as count FROM recommendations r JOIN institutions i ON r.institution_id = i.id WHERE r.status IN ('Processed', 'Pending_AI', 'Draft') AND i.user_id = ?", [uid]),
-      queryAll(`SELECT r.id, r.total_estimated_cost, r.created_at, r.status, r.source, r.owner,
-              r.institution_id, i.name as institution_name, i.institution_type
-       FROM recommendations r
-       JOIN institutions i ON r.institution_id = i.id
-       WHERE i.user_id = ?
-       ORDER BY r.created_at DESC
-       LIMIT 20`, [uid])
+    // Get user's institutions first
+    const userInsts = await queryAll('SELECT id FROM institutions WHERE user_id = ?', [uid]);
+    const userInstIds = userInsts.map(i => i.id);
+    const hasInsts = userInstIds.length > 0;
+    const placeholders = hasInsts ? userInstIds.map(() => '?').join(',') : '';
+
+    let volumeResult = [{ total_volume: 0 }], activeResult = [{ count: 0 }], historyLogs = [];
+    if (hasInsts) {
+      [volumeResult, activeResult, historyLogs] = await Promise.all([
+        queryAll(`SELECT COALESCE(SUM(total_estimated_cost), 0) as total_volume FROM recommendations WHERE status = 'Processed' AND institution_id IN (${placeholders})`, userInstIds),
+        queryAll(`SELECT COUNT(*) as count FROM recommendations WHERE status IN ('Processed', 'Pending_AI', 'Draft') AND institution_id IN (${placeholders})`, userInstIds),
+        queryAll(`SELECT id, total_estimated_cost, created_at, status, source, owner, institution_id FROM recommendations WHERE institution_id IN (${placeholders}) ORDER BY created_at DESC LIMIT 20`, userInstIds)
+      ]);
+      // Enrich history logs with institution names
+      historyLogs = await Promise.all((historyLogs || []).map(async (r) => {
+        const inst = await queryOne('SELECT name as institution_name, institution_type FROM institutions WHERE id = ?', [r.institution_id]);
+        return { ...r, ...(inst || {}) };
+      }));
+    }
+
+    const [totalProfiles] = await Promise.all([
+      queryAll('SELECT COUNT(*) as count FROM institutions WHERE user_id = ?', [uid])
     ]);
 
     const totalProfilesCount = totalProfiles[0]?.count || 0;

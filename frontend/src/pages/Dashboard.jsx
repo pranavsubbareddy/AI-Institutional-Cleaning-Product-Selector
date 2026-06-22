@@ -22,6 +22,7 @@ export default function Dashboard() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUndoing, setIsUndoing] = useState(false);
   const undoTimeoutRef = useRef(null);
+  const undoDataRef = useRef(null); // Store undo data in ref to avoid closure issues
 
   useEffect(() => {
     fetchDashboard();
@@ -79,10 +80,12 @@ export default function Dashboard() {
 
       // Show undo toast
       setUndoToast({ id, name, data: institutionData });
+      undoDataRef.current = { id, name, data: institutionData };
 
       // Auto-dismiss undo after 5 seconds
       undoTimeoutRef.current = setTimeout(() => {
         setUndoToast(null);
+        undoDataRef.current = null;
         undoTimeoutRef.current = null;
       }, 5000);
     } catch (err) {
@@ -90,6 +93,7 @@ export default function Dashboard() {
       setConfirmDialog(null);
       // Show error toast instead of alert
       setUndoToast(null);
+      undoDataRef.current = null;
       if (undoTimeoutRef.current) {
         clearTimeout(undoTimeoutRef.current);
         undoTimeoutRef.current = null;
@@ -108,12 +112,13 @@ export default function Dashboard() {
   };
 
   const handleUndo = useCallback(async () => {
-    if (!undoToast || !undoToast.data) return;
+    const toast = undoDataRef.current;
+    if (!toast || !toast.data) return;
     if (undoTimeoutRef.current) {
       clearTimeout(undoTimeoutRef.current);
       undoTimeoutRef.current = null;
     }
-    const { data } = undoToast;
+    const { data } = toast;
     setIsUndoing(true);
     try {
       const res = await api.createInstitution({
@@ -130,9 +135,14 @@ export default function Dashboard() {
         metadata: data.metadata || {}
       });
       setUndoToast(null);
+      undoDataRef.current = null;
       setInstitutions(prev => [res.data, ...prev]);
     } catch (err) {
       console.error('[Undo] Failed to restore institution:', err);
+      // Log the full error details for debugging
+      if (err.response) {
+        console.error('[Undo] Server response:', err.response);
+      }
       // Show error toast
       setUndoToast({ id: null, name: 'Failed to undo deletion: ' + err.message, data: null, isError: true });
       undoTimeoutRef.current = setTimeout(() => {
@@ -142,7 +152,7 @@ export default function Dashboard() {
     } finally {
       setIsUndoing(false);
     }
-  }, [undoToast]);
+  }, [user]); // depends on user only; reads undo data from ref
 
   // Show skeleton during loading, then smoothly transition to content
   if (loading && !ready) {

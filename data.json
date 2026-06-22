@@ -167,7 +167,7 @@
       "total_estimated_cost": 18287724,
       "monthly_total_quantity": 44914,
       "summary": "Recommended 8 products for factory facility of 20000 sq. ft. Monthly cost: Rs 1,82,87,724.",
-      "alerts": "[\"High hygiene standard detected: Increase cleaning frequency and use appropriate PPE.; Large area detected: Consider bulk ordering for cost savings. Tier discounts available for orders over 50 units.; Estimated monthly cost exceeds Rs 1,00,000: Special contract pricing may be available. Contact sales for negotiation.; Eco-friendly preferences detected: Recommended products are selected for environmental compatibility.\"]",
+      "alerts": "[\\\"High hygiene standard detected: Increase cleaning frequency and use appropriate PPE.; Large area detected: Consider bulk ordering for cost savings. Tier discounts available for orders over 50 units.; Estimated monthly cost exceeds Rs 1,00,000: Special contract pricing may be available. Contact sales for negotiation.; Eco-friendly preferences detected: Recommended products are selected for environmental compatibility.\\\"]",
       "source": "AI_Engine",
       "owner": "system",
       "processed_at": "2026-06-12T13:39:37.187Z",
@@ -181,7 +181,7 @@
       "total_estimated_cost": 438820,
       "monthly_total_quantity": 1502,
       "summary": "Recommended 8 products for hospital facility of 120 sq. ft. Monthly cost: Rs 4,38,820.",
-      "alerts": "[\"Critical healthcare facility: Ensure all disinfectants meet health board standards. Maintain log of cleaning activities.; Estimated monthly cost exceeds Rs 1,00,000: Special contract pricing may be available. Contact sales for negotiation.; Eco-friendly preferences detected: Recommended products are selected for environmental compatibility.\"]",
+      "alerts": "[\\\"Critical healthcare facility: Ensure all disinfectants meet health board standards. Maintain log of cleaning activities.; Estimated monthly cost exceeds Rs 1,00,000: Special contract pricing may be available. Contact sales for negotiation.; Eco-friendly preferences detected: Recommended products are selected for environmental compatibility.\\\"]",
       "source": "Rule_Engine",
       "owner": "system",
       "processed_at": "2026-06-13T16:08:17.086Z",
@@ -209,7 +209,7 @@
       "total_estimated_cost": 6520,
       "monthly_total_quantity": 13,
       "summary": "AI recommended 5 products for warehouse facility of 5000 sq. ft. Monthly cost: Rs 6,520.",
-      "alerts": "[\"The estimated monthly cost of INR 6520 is well within a medium budget for a 5000 sq ft warehouse with high hygiene requirements.\"]",
+      "alerts": "[\\\"The estimated monthly cost of INR 6520 is well within a medium budget for a 5000 sq ft warehouse with high hygiene requirements.\\\"]",
       "source": "AI_Engine",
       "owner": "system",
       "processed_at": "2026-06-14T11:14:53.907Z",
@@ -481,7 +481,7 @@
       "usage_frequency": "Monthly",
       "priority": 1,
       "usage_guidance": "For daily cleaning, spray onto surface, wait 1 minute, then wipe with a cloth. For tough stains, spray liberally, wait 5 minutes, scrub, and rinse.",
-      "safety_notes": "Keep out of reach of children. Avoid contact with eyes and skin. In case of contact, rinse immediately with plenty of water. Do not ingest. Use in a well-ventilated area.",
+      "safety_notes": "Keep out of reach of children. Avoid contact with eyes and skin. In case of contact, rinse immediately with plenty of water. Do not ingest. Do not use in a well-ventilated area.",
       "base_price": 150
     },
     {
@@ -599,5 +599,11 @@
       "createdAt": "2026-06-16T05:26:14.451Z"
     }
   ],
-  "PRODUCTS": []
+  "PRODUCTS": [],
+  "WAREHOUSES": [],
+  "STOCK": [],
+  "ORDERS": [],
+  "DELIVERIES": [],
+  "VISITS": [],
+  "MSDS": []
 }

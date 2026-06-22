@@ -92,10 +92,10 @@ describe('validateInstitutionInput', () => {
       expect(res.status).toHaveBeenCalledWith(400);
     });
 
-    test('rejects invalid type', () => {
-      const { req, res, next } = mockReqRes({ ...validBody, institution_type: 'invalid_type' });
+    test('now accepts any non-empty institution type string (custom types allowed)', () => {
+      const { req, res, next } = mockReqRes({ ...validBody, institution_type: 'custom_type' });
       validateInstitutionInput(req, res, next);
-      expect(res.status).toHaveBeenCalledWith(400);
+      expect(next).toHaveBeenCalled();
     });
 
     test('accepts all valid types', () => {
@@ -156,21 +156,10 @@ describe('validateInstitutionInput', () => {
       expect(res.status).toHaveBeenCalledWith(400);
     });
 
-    test('rejects invalid surface types', () => {
-      const { req, res, next } = mockReqRes({ ...validBody, surface_types: ['invalid_surface'] });
+    test('now accepts any non-empty surface type string (custom surfaces allowed)', () => {
+      const { req, res, next } = mockReqRes({ ...validBody, surface_types: ['custom_surface', 'concrete', 'metal'] });
       validateInstitutionInput(req, res, next);
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith(
-        expect.objectContaining({
-          details: expect.arrayContaining([expect.stringContaining('Invalid surface types')]),
-        })
-      );
-    });
-
-    test('rejects partially invalid surface types', () => {
-      const { req, res, next } = mockReqRes({ ...validBody, surface_types: ['hard_floor', 'invalid_type'] });
-      validateInstitutionInput(req, res, next);
-      expect(res.status).toHaveBeenCalledWith(400);
+      expect(next).toHaveBeenCalled();
     });
 
     test('accepts all valid surface types', () => {
@@ -311,7 +300,9 @@ describe('validateInstitutionInput', () => {
       const details = res.json.mock.calls[0][0].details;
       // Expect errors only for name, institution_type, area_size, surface_types, hygiene, budget
       // Contact fields are now optional so they should NOT produce error entries
-      expect(details.length).toBeGreaterThanOrEqual(6);
+      // After permissive validation, institution_type='' is too short, budget='' fails
+      // Contact fields are now optional so they should NOT produce error entries
+      expect(details.length).toBeGreaterThanOrEqual(4);
       expect(details.length).toBeLessThanOrEqual(6);
       // Verify contact fields don't appear in the errors
       const allErrors = details.join(' ').toLowerCase();

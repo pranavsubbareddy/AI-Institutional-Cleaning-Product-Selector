@@ -35,7 +35,15 @@ function seedFromDisk() {
           RECS: 'recommendations',
           ITEMS: 'recommendation_items',
           USERS: 'users',
-          PRODUCTS: 'products'
+          PRODUCTS: 'products',
+          AUDIT: 'recommendation_audit_log',
+          WAREHOUSES: 'warehouses',
+          STOCK: 'stock_batches',
+          ORDERS: 'orders',
+          DELIVERIES: 'delivery_runs',
+          VISITS: 'salesman_visits',
+          MSDS: 'msds_documents',
+          ACKS: 'compliance_acknowledgements'
         };
         let totalLoaded = 0;
         for (const [key, tableName] of Object.entries(tableMap)) {
@@ -160,7 +168,15 @@ function applyDiskSnapshot(path) {
     RECS: 'recommendations',
     ITEMS: 'recommendation_items',
     USERS: 'users',
-    PRODUCTS: 'products'
+    PRODUCTS: 'products',
+    AUDIT: 'recommendation_audit_log',
+    WAREHOUSES: 'warehouses',
+    STOCK: 'stock_batches',
+    ORDERS: 'orders',
+    DELIVERIES: 'delivery_runs',
+    VISITS: 'salesman_visits',
+    MSDS: 'msds_documents',
+    ACKS: 'compliance_acknowledgements'
   };
   for (const [key, tableName] of Object.entries(tableMap)) {
     memoryTables[tableName] = Array.isArray(data[key]) ? data[key].slice() : [];
@@ -224,7 +240,15 @@ function flushMemoryToDisk() {
       RECS: memTable('recommendations'),
       ITEMS: memTable('recommendation_items'),
       USERS: memTable('users'),
-      PRODUCTS: memTable('products')
+      PRODUCTS: memTable('products'),
+      AUDIT: memTable('recommendation_audit_log'),
+      WAREHOUSES: memTable('warehouses'),
+      STOCK: memTable('stock_batches'),
+      ORDERS: memTable('orders'),
+      DELIVERIES: memTable('delivery_runs'),
+      VISITS: memTable('salesman_visits'),
+      MSDS: memTable('msds_documents'),
+      ACKS: memTable('compliance_acknowledgements')
     };
     const json = JSON.stringify(data, null, 2);
     try {
@@ -281,10 +305,9 @@ function tokenize(sql) {
 // that the previous character is a token boundary (whitespace, paren, comma,
 // or the start of the clause). This allows e.g. "? AND" or "(col = ?) AND".
 function isKeywordStart(clause, i, keyword) {
-  if (clause.substring(i, i + keyword.length).toUpperCase() !== keyword) return false;
-  if (i === 0) return true;
-  const prev = clause[i - 1];
-  return /\s/.test(prev) || prev === '(' || prev === ',' || prev === '?';
+  if (clause.substring(i, i + keyword.length).toUpperCase() !== keyword) return false;    if (i === 0) return true;
+    const prev = clause[i - 1];
+    return /\s/.test(prev) || prev === '(' || prev === ',' || prev === '?' || prev === "'" || prev === '"';
 }
 
 // Split WHERE clause by top-level OR (not inside parentheses)
@@ -606,7 +629,7 @@ async function initializeSchema() {
   // JSON fields are stored as TEXT and application code handles null -> '[]' fallback.
 
   await pool.execute(`CREATE TABLE IF NOT EXISTS products (
-    id VARCHAR(36) PRIMARY KEY,
+    id VARCHAR(50) PRIMARY KEY,
     sku VARCHAR(50) UNIQUE,
     name VARCHAR(255) NOT NULL,
     description TEXT,
@@ -622,6 +645,8 @@ async function initializeSchema() {
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+  // Widen id columns on existing tables (safe if already widened)
+  try { await pool.execute('ALTER TABLE products MODIFY COLUMN id VARCHAR(50)'); } catch (e) {}
 
   await pool.execute(`CREATE TABLE IF NOT EXISTS institutions (
     id VARCHAR(36) PRIMARY KEY,
@@ -684,18 +709,19 @@ async function initializeSchema() {
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
 
   await pool.execute(`CREATE TABLE IF NOT EXISTS warehouses (
-    id VARCHAR(36) PRIMARY KEY,
+    id VARCHAR(50) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     location TEXT,
     contact_person VARCHAR(255),
     contact_phone VARCHAR(50),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+  try { await pool.execute('ALTER TABLE warehouses MODIFY COLUMN id VARCHAR(50)'); } catch (e) {}
 
   await pool.execute(`CREATE TABLE IF NOT EXISTS stock_batches (
-    id VARCHAR(36) PRIMARY KEY,
-    product_id VARCHAR(36) NOT NULL,
-    warehouse_id VARCHAR(36) NOT NULL,
+    id VARCHAR(50) PRIMARY KEY,
+    product_id VARCHAR(50) NOT NULL,
+    warehouse_id VARCHAR(50) NOT NULL,
     batch_number VARCHAR(100) NOT NULL,
     quantity DECIMAL(10,2) NOT NULL DEFAULT 0,
     expiry_date DATE,
@@ -703,9 +729,12 @@ async function initializeSchema() {
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
     FOREIGN KEY (warehouse_id) REFERENCES warehouses(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+  try { await pool.execute('ALTER TABLE stock_batches MODIFY COLUMN id VARCHAR(50)'); } catch (e) {}
+  try { await pool.execute('ALTER TABLE stock_batches MODIFY COLUMN product_id VARCHAR(50)'); } catch (e) {}
+  try { await pool.execute('ALTER TABLE stock_batches MODIFY COLUMN warehouse_id VARCHAR(50)'); } catch (e) {}
 
   await pool.execute(`CREATE TABLE IF NOT EXISTS orders (
-    id VARCHAR(36) PRIMARY KEY,
+    id VARCHAR(50) PRIMARY KEY,
     institution_id VARCHAR(36) NOT NULL,
     recommendation_id VARCHAR(36),
     status VARCHAR(20) DEFAULT 'pending',
@@ -717,10 +746,11 @@ async function initializeSchema() {
     FOREIGN KEY (institution_id) REFERENCES institutions(id) ON DELETE CASCADE,
     FOREIGN KEY (recommendation_id) REFERENCES recommendations(id) ON DELETE SET NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+  try { await pool.execute('ALTER TABLE orders MODIFY COLUMN id VARCHAR(50)'); } catch (e) {}
 
   await pool.execute(`CREATE TABLE IF NOT EXISTS delivery_runs (
-    id VARCHAR(36) PRIMARY KEY,
-    order_id VARCHAR(36) NOT NULL,
+    id VARCHAR(50) PRIMARY KEY,
+    order_id VARCHAR(50) NOT NULL,
     driver_name VARCHAR(255),
     vehicle_number VARCHAR(50),
     status VARCHAR(20) DEFAULT 'scheduled',
@@ -730,9 +760,11 @@ async function initializeSchema() {
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+  try { await pool.execute('ALTER TABLE delivery_runs MODIFY COLUMN id VARCHAR(50)'); } catch (e) {}
+  try { await pool.execute('ALTER TABLE delivery_runs MODIFY COLUMN order_id VARCHAR(50)'); } catch (e) {}
 
   await pool.execute(`CREATE TABLE IF NOT EXISTS salesman_visits (
-    id VARCHAR(36) PRIMARY KEY,
+    id VARCHAR(50) PRIMARY KEY,
     institution_id VARCHAR(36) NOT NULL,
     salesman_name VARCHAR(255) NOT NULL,
     visit_date DATE NOT NULL,
@@ -743,9 +775,10 @@ async function initializeSchema() {
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (institution_id) REFERENCES institutions(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+  try { await pool.execute('ALTER TABLE salesman_visits MODIFY COLUMN id VARCHAR(50)'); } catch (e) {}
 
   await pool.execute(`CREATE TABLE IF NOT EXISTS reorder_reminders (
-    id VARCHAR(36) PRIMARY KEY,
+    id VARCHAR(50) PRIMARY KEY,
     product_id VARCHAR(36) NOT NULL,
     institution_id VARCHAR(36),
     threshold_quantity DECIMAL(10,2) NOT NULL DEFAULT 10,
@@ -755,9 +788,10 @@ async function initializeSchema() {
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
     FOREIGN KEY (institution_id) REFERENCES institutions(id) ON DELETE SET NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+  try { await pool.execute('ALTER TABLE reorder_reminders MODIFY COLUMN id VARCHAR(50)'); } catch (e) {}
 
   await pool.execute(`CREATE TABLE IF NOT EXISTS contract_prices (
-    id VARCHAR(36) PRIMARY KEY,
+    id VARCHAR(50) PRIMARY KEY,
     product_id VARCHAR(36) NOT NULL,
     institution_id VARCHAR(36) NOT NULL,
     contract_price DECIMAL(10,2) NOT NULL,
@@ -767,9 +801,10 @@ async function initializeSchema() {
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
     FOREIGN KEY (institution_id) REFERENCES institutions(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+  try { await pool.execute('ALTER TABLE contract_prices MODIFY COLUMN id VARCHAR(50)'); } catch (e) {}
 
   await pool.execute(`CREATE TABLE IF NOT EXISTS tier_discounts (
-    id VARCHAR(36) PRIMARY KEY,
+    id VARCHAR(50) PRIMARY KEY,
     product_id VARCHAR(36) NOT NULL,
     min_quantity DECIMAL(10,2) NOT NULL DEFAULT 0,
     max_quantity DECIMAL(10,2),
@@ -777,9 +812,10 @@ async function initializeSchema() {
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+  try { await pool.execute('ALTER TABLE tier_discounts MODIFY COLUMN id VARCHAR(50)'); } catch (e) {}
 
   await pool.execute(`CREATE TABLE IF NOT EXISTS msds_documents (
-    id VARCHAR(36) PRIMARY KEY,
+    id VARCHAR(50) PRIMARY KEY,
     product_id VARCHAR(36) NOT NULL,
     title VARCHAR(255) NOT NULL,
     document_url TEXT,
@@ -787,9 +823,10 @@ async function initializeSchema() {
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+  try { await pool.execute('ALTER TABLE msds_documents MODIFY COLUMN id VARCHAR(50)'); } catch (e) {}
 
   await pool.execute(`CREATE TABLE IF NOT EXISTS compliance_acknowledgements (
-    id VARCHAR(36) PRIMARY KEY,
+    id VARCHAR(50) PRIMARY KEY,
     institution_id VARCHAR(36) NOT NULL,
     document_id VARCHAR(36) NOT NULL,
     acknowledged_by VARCHAR(255) NOT NULL,
@@ -797,8 +834,23 @@ async function initializeSchema() {
     FOREIGN KEY (institution_id) REFERENCES institutions(id) ON DELETE CASCADE,
     FOREIGN KEY (document_id) REFERENCES msds_documents(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+  try { await pool.execute('ALTER TABLE compliance_acknowledgements MODIFY COLUMN id VARCHAR(50)'); } catch (e) {}
 
   // ── Users table ─────────────────────────────────────────────────────────
+  // ── Recommendation Audit Log table ──────────────────────────────────
+  await pool.execute(`CREATE TABLE IF NOT EXISTS recommendation_audit_log (
+    id VARCHAR(50) PRIMARY KEY,
+    recommendation_id VARCHAR(36) NOT NULL,
+    old_status VARCHAR(50),
+    new_status VARCHAR(50) NOT NULL,
+    changed_by_uid VARCHAR(50) NOT NULL,
+    changed_by_email VARCHAR(255),
+    changed_by_role VARCHAR(20),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (recommendation_id) REFERENCES recommendations(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+  try { await pool.execute('ALTER TABLE recommendation_audit_log MODIFY COLUMN id VARCHAR(50)'); } catch (e) {}
+
   await pool.execute(`CREATE TABLE IF NOT EXISTS users (
     uid VARCHAR(50) PRIMARY KEY,
     email VARCHAR(255) NOT NULL UNIQUE,
@@ -882,8 +934,8 @@ async function initializeSchema() {
 
   // ── Workflow Events table (audit trail) ───────────────────────────────
   await pool.execute(`CREATE TABLE IF NOT EXISTS workflow_events (
-    id VARCHAR(36) PRIMARY KEY,
-    order_id VARCHAR(36) NOT NULL,
+    id VARCHAR(50) PRIMARY KEY,
+    order_id VARCHAR(50) NOT NULL,
     from_stage VARCHAR(50),
     to_stage VARCHAR(50) NOT NULL,
     action VARCHAR(100) NOT NULL,
@@ -893,6 +945,8 @@ async function initializeSchema() {
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+  try { await pool.execute('ALTER TABLE workflow_events MODIFY COLUMN id VARCHAR(50)'); } catch (e) {}
+  try { await pool.execute('ALTER TABLE workflow_events MODIFY COLUMN order_id VARCHAR(50)'); } catch (e) {}
 
   // Add workflow stage columns to orders (safe if already exist)
   try {
@@ -922,6 +976,68 @@ async function initializeSchema() {
   try {
     await pool.execute('ALTER TABLE orders ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at');
   } catch (e) {}
+
+  // ── Seed new tables from data.json if empty ──────────────────────
+  try {
+    const seedDataPath = path.join(__dirname, '..', '..', '..', 'data.json');
+    if (fs.existsSync(seedDataPath)) {
+      const seedRaw = fs.readFileSync(seedDataPath, 'utf-8');
+      const seed = JSON.parse(seedRaw);
+
+      const seedable = [
+        { key: 'WAREHOUSES', table: 'warehouses', cols: ['id','name','location','contact_person','contact_phone','created_at'] },
+        { key: 'STOCK', table: 'stock_batches', cols: ['id','product_id','warehouse_id','batch_number','quantity','expiry_date','created_at'] },
+        { key: 'ORDERS', table: 'orders', cols: ['id','institution_id','recommendation_id','status','total_amount','order_date','delivery_date','notes','created_at'] },
+        { key: 'DELIVERIES', table: 'delivery_runs', cols: ['id','order_id','driver_name','vehicle_number','status','scheduled_date','completed_date','notes','created_at'] },
+        { key: 'VISITS', table: 'salesman_visits', cols: ['id','institution_id','salesman_name','visit_date','purpose','notes','follow_up_date','status','created_at'] },
+        { key: 'MSDS', table: 'msds_documents', cols: ['id','product_id','title','document_url','version','created_at'] }
+      ];
+
+      // Disable FK checks during seed to avoid missing-reference errors
+      await pool.execute('SET FOREIGN_KEY_CHECKS = 0');
+
+      for (const s of seedable) {
+        const rows = seed[s.key];
+        if (!rows || rows.length === 0) continue;
+        const countResult = await pool.execute(`SELECT COUNT(*) as count FROM \`${s.table}\``);
+        const existingCount = countResult[0][0]?.count || 0;
+        if (existingCount > 0) {
+          console.log(`  Table "${s.table}" already has ${existingCount} row(s) — skipping seed`);
+          continue;
+        }
+        const placeholders = s.cols.map(() => '?').join(', ');
+        const colList = s.cols.map(c => `\`${c}\``).join(', ');
+        for (const row of rows) {
+          // Convert ISO date strings to MySQL-compatible format (YYYY-MM-DD HH:MM:SS)
+          function toMysqlDate(val) {
+            if (typeof val !== 'string') return val;
+            const m = val.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})/);
+            if (m) return m[1] + ' ' + m[2];
+            return val;
+          }
+          const values = s.cols.map(col => {
+            const v = row[col];
+            if (v === undefined || v === null) return null;
+            if (col === 'surface_types' && Array.isArray(v)) return JSON.stringify(v);
+            if (col === 'metadata' && typeof v === 'object') return JSON.stringify(v);
+            return toMysqlDate(v);
+          });
+          try {
+            await pool.execute(`INSERT INTO \`${s.table}\` (${colList}) VALUES (${placeholders})`, values);
+          } catch (insErr) {
+            if (insErr.code !== 'ER_DUP_ENTRY') {
+              console.warn(`  [seed] Could not insert into ${s.table}: ${insErr.message}`);
+            }
+          }
+        }
+        console.log(`  Seeded ${rows.length} record(s) into "${s.table}"`);
+      }
+
+      await pool.execute('SET FOREIGN_KEY_CHECKS = 1');
+    }
+  } catch (seedErr) {
+    console.warn('  [seed] Failed to seed new tables from data.json:', seedErr.message);
+  }
 
   console.log(' Database schema initialized');
   return pool;

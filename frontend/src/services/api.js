@@ -83,6 +83,7 @@ export const api = {
     return fetchApi(`/recommendations${query ? `?${query}` : ''}`);
   },
   getRecommendation: (id) => fetchApi(`/recommendations/${id}`),
+  updateRecommendationStatus: (id, status) => fetchApi(`/recommendations/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) }),
 
   // Auth
   signup: (data) => fetchApi('/auth/signup', { method: 'POST', body: JSON.stringify(data) }),
@@ -107,9 +108,75 @@ export const api = {
   // Admin Dashboard
   getAdminDashboard: () => fetchApi('/admin/dashboard'),
 
+  // Admin Activity Logs
+  getAdminActivityLogs: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return fetchApi(`/admin/activity-logs${query ? `?${query}` : ''}`);
+  },
+
+  // Admin Audit Logs (dedicated endpoint)
+  getAdminAuditLogs: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return fetchApi(`/admin/audit-logs${query ? `?${query}` : ''}`);
+  },
+
   // Admin User Management
   getAdminUsers: () => fetchApi('/admin/users'),
   updateUserRole: (uid, role) => fetchApi(`/admin/users/${uid}/role`, { method: 'PUT', body: JSON.stringify({ role }) }),
+
+  // Warehouse & Stock
+  getWarehouses: () => fetchApi('/warehouses'),
+  getWarehouse: (id) => fetchApi(`/warehouses/${id}`),
+  createWarehouse: (data) => fetchApi('/warehouses', { method: 'POST', body: JSON.stringify(data) }),
+  updateWarehouse: (id, data) => fetchApi(`/warehouses/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteWarehouse: (id) => fetchApi(`/warehouses/${id}`, { method: 'DELETE' }),
+  getAllStockBatches: () => fetchApi('/warehouses/all/batches'),
+  getWarehouseBatches: (id) => fetchApi(`/warehouses/${id}/batches`),
+  createStockBatch: (warehouseId, data) => fetchApi(`/warehouses/${warehouseId}/batches`, { method: 'POST', body: JSON.stringify(data) }),
+  updateStockBatch: (warehouseId, batchId, data) => fetchApi(`/warehouses/${warehouseId}/batches/${batchId}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteStockBatch: (warehouseId, batchId) => fetchApi(`/warehouses/${warehouseId}/batches/${batchId}`, { method: 'DELETE' }),
+
+  // Deliveries
+  getDeliveries: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return fetchApi(`/deliveries${query ? `?${query}` : ''}`);
+  },
+  getDelivery: (id) => fetchApi(`/deliveries/${id}`),
+  createDelivery: (data) => fetchApi('/deliveries', { method: 'POST', body: JSON.stringify(data) }),
+  updateDelivery: (id, data) => fetchApi(`/deliveries/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteDelivery: (id) => fetchApi(`/deliveries/${id}`, { method: 'DELETE' }),
+
+  // Salesman Visits
+  getSalesmanVisits: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return fetchApi(`/salesman${query ? `?${query}` : ''}`);
+  },
+  getSalesmanVisit: (id) => fetchApi(`/salesman/${id}`),
+  createSalesmanVisit: (data) => fetchApi('/salesman', { method: 'POST', body: JSON.stringify(data) }),
+  updateSalesmanVisit: (id, data) => fetchApi(`/salesman/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteSalesmanVisit: (id) => fetchApi(`/salesman/${id}`, { method: 'DELETE' }),
+
+  // Orders
+  getOrders: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return fetchApi(`/orders${query ? '?' + query : ''}`);
+  },
+  getOrder: (id) => fetchApi(`/orders/${id}`),
+  createOrder: (data) => fetchApi('/orders', { method: 'POST', body: JSON.stringify(data) }),
+  updateOrder: (id, data) => fetchApi(`/orders/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteOrder: (id) => fetchApi(`/orders/${id}`, { method: 'DELETE' }),
+  advanceOrderWorkflow: (id, data) => fetchApi(`/orders/${id}/workflow`, { method: 'POST', body: JSON.stringify(data) }),
+  getOrderInvoice: (id) => fetchApi(`/orders/${id}/invoice`),
+  getOrderStats: () => fetchApi('/orders/stats'),
+
+  // Compliance
+  getComplianceDocs: () => fetchApi('/compliance'),
+  getComplianceDoc: (id) => fetchApi(`/compliance/${id}`),
+  createComplianceDoc: (data) => fetchApi('/compliance', { method: 'POST', body: JSON.stringify(data) }),
+  updateComplianceDoc: (id, data) => fetchApi(`/compliance/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteComplianceDoc: (id) => fetchApi(`/compliance/${id}`, { method: 'DELETE' }),
+  acknowledgeComplianceDoc: (data) => fetchApi('/compliance/acknowledge', { method: 'POST', body: JSON.stringify(data) }),
+  getComplianceAcknowledgements: (institutionId) => fetchApi(`/compliance/acknowledgements/${institutionId}`),
 };
 
 // Helper to format currency

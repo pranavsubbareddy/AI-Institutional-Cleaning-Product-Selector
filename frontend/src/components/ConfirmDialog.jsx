@@ -9,7 +9,10 @@ export default function ConfirmDialog({
   variant = 'danger',
   isLoading = false,
   onConfirm,
-  onCancel
+  onCancel,
+  showDontAskAgain = false,
+  dontAskAgain = false,
+  onDontAskAgainChange
 }) {
   const confirmRef = useRef(null);
 
@@ -90,6 +93,19 @@ export default function ConfirmDialog({
             <p className="text-sm text-surface-400 mt-1 leading-relaxed">
               {message}
             </p>
+            {showDontAskAgain && (
+              <label className="flex items-center gap-2 mt-4 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={dontAskAgain}
+                  onChange={(e) => onDontAskAgainChange?.(e.target.checked)}
+                  className="w-4 h-4 rounded border-surface-600 bg-surface-700 text-amber-500 focus:ring-amber-500/30 focus:ring-offset-0 cursor-pointer"
+                />
+                <span className="text-xs text-surface-400 group-hover:text-surface-300 transition-colors select-none">
+                  Don't ask again for this session
+                </span>
+              </label>
+            )}
           </div>
         </div>
 

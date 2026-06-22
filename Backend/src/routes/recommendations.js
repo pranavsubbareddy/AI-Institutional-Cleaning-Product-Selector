@@ -512,32 +512,44 @@ router.get('/:id', async (req, res, next) => {
       });
     }
 
-    // Step 2: Fetch the associated institution to verify ownership AND get institution fields
-    const institution = await queryOne(
-      'SELECT * FROM institutions WHERE id = ? AND user_id = ?',
-      [recommendation.institution_id, req.user.uid]
-    );
-
-    if (!institution) {
-      return res.status(404).json({
-        success: false,
-        error: 'Recommendation not found',
-        timestamp: new Date().toISOString()
-      });
+    // Step 2: Fetch the associated institution
+    // Admins can view any recommendation; regular users can only view their own
+    let institution;
+    if (req.user.role === 'admin' || req.user.role === 'sales_admin') {
+      institution = await queryOne(
+        'SELECT * FROM institutions WHERE id = ?',
+        [recommendation.institution_id]
+      );
+    } else {
+      institution = await queryOne(
+        'SELECT * FROM institutions WHERE id = ? AND user_id = ?',
+        [recommendation.institution_id, req.user.uid]
+      );
     }
 
-    // Step 3: Merge institution fields into the recommendation
-    recommendation.institution_name = institution.name;
-    recommendation.institution_type = institution.institution_type;
-    recommendation.area_size = institution.area_size;
-    recommendation.hygiene_standard = institution.hygiene_standard;
-    recommendation.budget = institution.budget;
-    recommendation.surface_types = institution.surface_types;
-    recommendation.metadata = safeJsonParse(institution.metadata, null);
-    recommendation.contact_email = institution.contact_email;
-    recommendation.contact_name = institution.contact_name;
+    if (!institution) {
+      // Institution might have been deleted — still return recommendation data
+      // with minimal institution info so audit log / detail pages can display it
+      recommendation.institution_name = 'Deleted Institution';
+      recommendation.institution_type = 'unknown';
+      recommendation.area_size = 0;
+      recommendation.hygiene_standard = 'standard';
+      recommendation.budget = 'medium';
+      recommendation.surface_types = '[]';
+      recommendation.metadata = null;
+    } else {
+      recommendation.institution_name = institution.name;
+      recommendation.institution_type = institution.institution_type;
+      recommendation.area_size = institution.area_size;
+      recommendation.hygiene_standard = institution.hygiene_standard;
+      recommendation.budget = institution.budget;
+      recommendation.surface_types = institution.surface_types;
+      recommendation.metadata = safeJsonParse(institution.metadata, null);
+      recommendation.contact_email = institution.contact_email;
+      recommendation.contact_name = institution.contact_name;
+    }
 
-    // Step 4: Fetch recommendation items (with product data via separate queries if needed)
+    // Step 3: Fetch recommendation items (with product data via separate queries if needed)
     let items = await queryAll(
       'SELECT * FROM recommendation_items WHERE recommendation_id = ? ORDER BY priority ASC',
       [req.params.id]
@@ -593,6 +605,73 @@ router.get('/:id', async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+});
+
+// ---------------------------------------------------------------------------
+// PUT /api/recommendations/:id/status — update recommendation status
+// Available to admins and sales admins for managing recommendation lifecycle
+// ---------------------------------------------------------------------------
+const VALID_STATUSES = ['New', 'Quoted', 'Pending_AI', 'Processed', 'Out for Delivery', 'Completed', 'Cancelled'];
+router.put('/:id/status', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!status || !VALID_STATUSES.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid status. Valid values: ' + VALID_STATUSES.join(', '),
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Allow admins & sales_admin to update any recommendation; regular users can only update their own
+    let recommendation;
+    if (req.user.role === 'admin' || req.user.role === 'sales_admin') {
+      recommendation = await queryOne('SELECT * FROM recommendations WHERE id = ?', [id]);
+    } else {
+      recommendation = await queryOne('SELECT * FROM recommendations WHERE id = ?', [id]);
+      if (recommendation) {
+        const inst = await queryOne('SELECT user_id FROM institutions WHERE id = ?', [recommendation.institution_id]);
+        if (!inst || inst.user_id !== req.user.uid) {
+          recommendation = null;
+        }
+      }
+    }
+
+    if (!recommendation) {
+      return res.status(404).json({
+        success: false,
+        error: 'Recommendation not found',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    const oldStatus = recommendation.status || 'New';
+    await run('UPDATE recommendations SET status = ?, updated_at = NOW() WHERE id = ?', [status, id]);
+
+    // ── Audit log entry ──────────────────────────────────────────────
+    try {
+      const auditId = uuidv4();
+      await run(
+        `INSERT INTO recommendation_audit_log (id, recommendation_id, old_status, new_status, changed_by_uid, changed_by_email, changed_by_role, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+        [auditId, id, oldStatus, status, req.user.uid, req.user.email || '', req.user.role || 'field_staff']
+      );
+    } catch (auditErr) {
+      // Non-fatal — audit log failure should not block the status update
+      console.error('[AuditLog] Failed to record status change:', auditErr.message);
+    }
+
+    const updated = await queryOne('SELECT * FROM recommendations WHERE id = ?', [id]);
+
+    res.json({
+      success: true,
+      message: 'Recommendation status updated to ' + status,
+      data: updated,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) { next(error); }
 });
 
 module.exports = router;
