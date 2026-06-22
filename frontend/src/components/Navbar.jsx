@@ -2,13 +2,51 @@ import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 // ── Quick links always visible in the top bar ────────────────────────
+// Role-based primary navigation — each role sees their relevant operation page as a primary link
+const ROLE_PRIMARY_LINKS = {
+  admin: [
+    { path: '/form', label: 'Form' },
+    { path: '/admin', label: 'Dashboard' },
+    { path: '/warehouse', label: 'Warehouse' },
+    { path: '/deliveries', label: 'Deliveries' },
+    { path: '/orders', label: 'Orders' },
+  ],
+  sales_admin: [
+    { path: '/form', label: 'Form' },
+    { path: '/admin-portal', label: 'Dashboard' },
+    { path: '/orders', label: 'Orders' },
+    { path: '/salesman', label: 'Sales' },
+  ],
+  salesman: [
+    { path: '/form', label: 'Form' },
+    { path: '/salesman', label: 'Visits' },
+    { path: '/dashboard', label: 'Dashboard' },
+  ],
+  warehouse_staff: [
+    { path: '/warehouse', label: 'Warehouse' },
+    { path: '/deliveries', label: 'Deliveries' },
+  ],
+  delivery_coordinator: [
+    { path: '/deliveries', label: 'Deliveries' },
+    { path: '/warehouse', label: 'Stock' },
+  ],
+  accounts_manager: [
+    { path: '/orders', label: 'Orders' },
+    { path: '/admin', label: 'Analytics' },
+  ],
+  compliance_admin: [
+    { path: '/compliance', label: 'Compliance' },
+    { path: '/dashboard', label: 'Dashboard' },
+  ],
+  field_staff: [
+    { path: '/form', label: 'Form' },
+    { path: '/dashboard', label: 'Dashboard' },
+  ]
+};
 const quickLinks = [
   { path: '/form', label: 'Form' },
   { path: '/dashboard', label: 'Dashboard' },
 ];
-
-const ADMIN_LEVEL_ROLES = ['admin', 'sales_admin', 'warehouse_staff', 'salesman', 'accounts_manager', 'compliance_admin'];
-const isAdminLevel = (role) => ADMIN_LEVEL_ROLES.includes(role || '');
 
 const AUTH_PAGES = ['/login', '/forgot-password', '/reset-password', '/verify-email'];
 
@@ -68,21 +106,36 @@ export default function Navbar() {
           {/* Desktop Navigation - hidden on auth pages */}
           {!isAuthPage && (
             <div className="hidden md:flex items-center gap-1">
-              {/* Quick links */}
-              {quickLinks.map(link => (
-                <Link
-                  key={link.path}
-                  to={link.path}
-                  className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                    isActive(link.path)
-                      ? 'bg-cyan-500/10 text-cyan-400 shadow-sm'
-                      : 'text-surface-400 hover:text-surface-200 hover:bg-surface-700/50'
-                  }`}
-                >
-                  {link.label}
-                </Link>
-              ))}
-
+              {/* Role-based primary links */}
+              {isAuthenticated && user?.role ? (
+                (ROLE_PRIMARY_LINKS[user.role] || quickLinks).map(link => (
+                  <Link
+                    key={link.path}
+                    to={link.path}
+                    className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      isActive(link.path)
+                        ? 'bg-cyan-500/10 text-cyan-400 shadow-sm'
+                        : 'text-surface-400 hover:text-surface-200 hover:bg-surface-700/50'
+                    }`}
+                  >
+                    {link.label}
+                  </Link>
+                ))
+              ) : (
+                quickLinks.map(link => (
+                  <Link
+                    key={link.path}
+                    to={link.path}
+                    className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      isActive(link.path)
+                        ? 'bg-cyan-500/10 text-cyan-400 shadow-sm'
+                        : 'text-surface-400 hover:text-surface-200 hover:bg-surface-700/50'
+                    }`}
+                  >
+                    {link.label}
+                  </Link>
+                ))
+              )}
             </div>
           )}
 
@@ -248,14 +301,21 @@ export default function Navbar() {
               </svg>
               Home
             </Link>
-            {quickLinks.map(link => (
-              <Link key={link.path} to={link.path} onClick={closeMobile}
-                className={`flex items-center px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${isActive(link.path) ? 'bg-cyan-500/10 text-cyan-400' : 'text-surface-400 hover:text-surface-200 hover:bg-surface-700/50'}`}>
-                {link.label}
-              </Link>
-            ))}
-
-
+            {isAuthenticated && user?.role ? (
+              (ROLE_PRIMARY_LINKS[user.role] || quickLinks).map(link => (
+                <Link key={link.path} to={link.path} onClick={closeMobile}
+                  className={`flex items-center px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${isActive(link.path) ? 'bg-cyan-500/10 text-cyan-400' : 'text-surface-400 hover:text-surface-200 hover:bg-surface-700/50'}`}>
+                  {link.label}
+                </Link>
+              ))
+            ) : (
+              quickLinks.map(link => (
+                <Link key={link.path} to={link.path} onClick={closeMobile}
+                  className={`flex items-center px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${isActive(link.path) ? 'bg-cyan-500/10 text-cyan-400' : 'text-surface-400 hover:text-surface-200 hover:bg-surface-700/50'}`}>
+                  {link.label}
+                </Link>
+              ))
+            )}
 
             {/* Auth action */}
             <div className="border-t border-surface-700/30 pt-2 mt-3">

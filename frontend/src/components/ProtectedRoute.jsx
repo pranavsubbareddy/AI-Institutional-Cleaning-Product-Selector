@@ -23,20 +23,32 @@ const PUBLIC_AUTH_ROUTES = [
 const ROLE_ROUTES = {
   // Super Admin - full access
   admin: [
-    '/admin-portal', '/admin', '/warehouse', '/deliveries', '/salesman', '/compliance'
+    '/admin-portal', '/admin', '/warehouse', '/deliveries', '/salesman', '/compliance', '/orders'
   ],
   // Sales Admin - CRM, customers, leads, quotations, sales reports
   sales_admin: [
     '/admin-portal', '/admin/users'
   ],
   // Salesman - assigned leads, customers, visits, follow-ups
-  salesman: [],
+  salesman: [
+    '/salesman'
+  ],
   // Warehouse Staff - inventory, orders, dispatch, delivery
-  warehouse_staff: [],
+  warehouse_staff: [
+    '/warehouse'
+  ],
   // Accounts Manager - invoices, payments, financial reports
-  accounts_manager: [],
+  accounts_manager: [
+    '/orders', '/admin'
+  ],
   // Compliance Admin - compliance, standards, approvals
-  compliance_admin: [],
+  compliance_admin: [
+    '/compliance'
+  ],
+  // Delivery Coordinator - delivery runs
+  delivery_coordinator: [
+    '/deliveries'
+  ],
   // Dealer - bulk orders, deliveries
   dealer: [],
   // Field Staff - facility management

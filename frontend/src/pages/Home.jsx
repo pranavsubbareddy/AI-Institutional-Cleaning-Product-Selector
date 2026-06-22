@@ -323,6 +323,25 @@ export default function Home() {
 
   const [loading, setLoading] = useState(true);
 
+  // Redirect authenticated role users to their operation landing page
+  useEffect(() => {
+    if (isAuthenticated && user?.role) {
+      const ROLE_HOME_PAGES = {
+        admin: '/admin',
+        sales_admin: '/admin-portal',
+        salesman: '/salesman',
+        warehouse_staff: '/warehouse',
+        delivery_coordinator: '/deliveries',
+        accounts_manager: '/orders',
+        compliance_admin: '/compliance',
+      };
+      const targetPage = ROLE_HOME_PAGES[user.role];
+      if (targetPage && targetPage !== window.location.pathname) {
+        navigate(targetPage, { replace: true });
+      }
+    }
+  }, [isAuthenticated, user, navigate]);
+
   // Fetch dynamic data based on role
   useEffect(() => {
     async function fetchData() {
@@ -354,6 +373,8 @@ export default function Home() {
   }, [isAuthenticated]);
 
   // If authenticated, render role-specific views
+  // Role-based users (admin, salesman, warehouse, etc.) get redirected above,
+  // but we still render for field_staff who stay on Home
   if (isAuthenticated) {
     if (user?.role === 'admin') {
       return (
@@ -368,6 +389,8 @@ export default function Home() {
         </div>
       );
     }
+    // For field_staff and other roles not redirected above, show UserHome
+    // Note: roles like salesman, warehouse_staff, etc. get redirected away by the useEffect above
     return (
       <div className="min-h-screen">
         <UserHome stats={stats} user={user} />

@@ -86,7 +86,8 @@ router.get('/dashboard', async (req, res, next) => {
           active_deliveries: deliveryCount[0]?.count || 0,
           salesman_visits: salesmanCount[0]?.count || 0,
           compliance_documents: complianceDocs[0]?.count || 0,
-          reorder_alerts: reorderAlerts[0]?.count || 0
+          reorder_alerts: reorderAlerts[0]?.count || 0,
+          orders: ordCount[0]?.count || 0
         },
         institutions_by_type: typeStats,
         hygiene_stats: hygieneStats,
