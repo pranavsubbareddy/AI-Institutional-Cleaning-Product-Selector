@@ -13,13 +13,14 @@ async function seedDatabase() {
   // ── Seed portal users ─────────────────────────────────────────────────────
   // Pre-defined accounts for each role with role-based access
   const portalUsers = [
-    { email: 'manager@ganga-maxx.com', pass: 'manager@123', name: 'Facility Manager', role: 'field_staff', phone: '+91-9000000001' },
-    { email: 'dealer@ganga-maxx.com', pass: 'dealer@123', name: 'Dealer Distributor', role: 'dealer', phone: '+91-9000000002' },
+    { email: 'admin@ganga-maxx.com', pass: 'Pranav@123', name: 'Super Admin', role: 'admin', phone: '+91-9000000000' },
+    { email: 'salesadmin@ganga-maxx.com', pass: 'salesadmin@123', name: 'Sales Administrator', role: 'sales_admin', phone: '+91-9000000007' },
     { email: 'salesman@ganga-maxx.com', pass: 'salesman@123', name: 'Field Sales Agent', role: 'salesman', phone: '+91-9000000003' },
     { email: 'warehouse@ganga-maxx.com', pass: 'warehouse@123', name: 'Warehouse Manager', role: 'warehouse_staff', phone: '+91-9000000004' },
     { email: 'accounts@ganga-maxx.com', pass: 'accounts@123', name: 'Accounts Manager', role: 'accounts_manager', phone: '+91-9000000005' },
     { email: 'compliance@ganga-maxx.com', pass: 'compliance@123', name: 'Compliance Officer', role: 'compliance_admin', phone: '+91-9000000006' },
-    { email: 'salesadmin@ganga-maxx.com', pass: 'salesadmin@123', name: 'Sales Administrator', role: 'sales_admin', phone: '+91-9000000007' },
+    { email: 'dealer@ganga-maxx.com', pass: 'dealer@123', name: 'Dealer Distributor', role: 'dealer', phone: '+91-9000000002' },
+    { email: 'manager@ganga-maxx.com', pass: 'manager@123', name: 'Facility Manager', role: 'field_staff', phone: '+91-9000000001' },
   ];
 
   const existingUsers = await queryAll('SELECT COUNT(*) as count FROM users').catch(() => [{ count: 0 }]);

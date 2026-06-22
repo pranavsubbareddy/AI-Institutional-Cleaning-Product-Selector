@@ -204,6 +204,11 @@ function applyDiskSnapshot(path) {
 function recordDeletion(id) {
   try {
     const p = getDeletionTombstonePath();
+    // Ensure the parent directory exists (e.g., /tmp/ on *nix, C:\tmp\ on Windows)
+    const dir = path.dirname(p);
+    if (!fs.existsSync(dir)) {
+      try { fs.mkdirSync(dir, { recursive: true }); } catch { /* best-effort */ }
+    }
     let list = [];
     try { list = JSON.parse(fs.readFileSync(p, 'utf-8')); if (!Array.isArray(list)) list = []; } catch { list = []; }
     if (!list.includes(id)) {
@@ -213,7 +218,7 @@ function recordDeletion(id) {
       console.log(`  [delete] Tombstoned institution ${id}`);
     }
   } catch (err) {
-    console.warn('  [delete] Could not write deletion tombstone:', err.message);
+    // Tombstone file is best-effort — the primary persistence is flushMemoryToDisk()
   }
 }
 
@@ -251,14 +256,24 @@ function flushMemoryToDisk() {
       ACKS: memTable('compliance_acknowledgements')
     };
     const json = JSON.stringify(data, null, 2);
+    let writtenPath = null;
     try {
       fs.writeFileSync(getDataFilePath(), json, 'utf-8');
+      writtenPath = getDataFilePath();
     } catch (writeErr) {
       try {
         fs.writeFileSync(getTempDataFilePath(), json, 'utf-8');
+        writtenPath = getTempDataFilePath();
       } catch (tmpErr) {
         console.warn('  [memSQL] Could not persist data to disk (both locations failed):', tmpErr.message);
       }
+    }
+    // Update the mtime tracker so the next reloadFromDiskIfChanged() doesn't
+    // unnecessarily re-read the file we just wrote.
+    if (writtenPath) {
+      try {
+        diskMtimeMs = fs.statSync(writtenPath).mtimeMs;
+      } catch { /* best-effort */ }
     }
   } catch (err) {
     console.warn('  [memSQL] Failed to serialize memory tables:', err.message);
@@ -556,7 +571,17 @@ function memQueryAll(sql, params) {
         // Tombstone removed institution IDs so they survive cold starts on
         // serverless (where the bundled data.json would otherwise resurrect them).
         if (tableName === 'institutions') {
-          removedRows.forEach(r => { if (r.id) recordDeletion(r.id); });
+          const removedIds = removedRows.map(r => r.id).filter(Boolean);
+          removedIds.forEach(id => recordDeletion(id));
+          // Also cascade-delete associated recommendations and items
+          if (memoryTables.recommendations) {
+            memoryTables.recommendations = memoryTables.recommendations.filter(r => !removedIds.includes(r.institution_id));
+          }
+          if (memoryTables.recommendation_items) {
+            // Delete items whose recommendation is orphaned (no matching rec)
+            const remainingRecIds = new Set((memoryTables.recommendations || []).map(r => r.id));
+            memoryTables.recommendation_items = memoryTables.recommendation_items.filter(item => remainingRecIds.has(item.recommendation_id));
+          }
         }
         everWritten = true;
         flushMemoryToDisk();

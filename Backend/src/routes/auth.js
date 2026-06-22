@@ -136,13 +136,14 @@ router.post('/login', async (req, res, next) => {
 
     // ── Portal seed users (fallback for when DB is unavailable) ────────
     const SEED_USERS = [
-      { email: 'manager@ganga-maxx.com', pass: 'manager@123', name: 'Facility Manager', role: 'field_staff' },
-      { email: 'dealer@ganga-maxx.com', pass: 'dealer@123', name: 'Dealer Distributor', role: 'dealer' },
+      { email: 'admin@ganga-maxx.com', pass: 'Pranav@123', name: 'Super Admin', role: 'admin' },
+      { email: 'salesadmin@ganga-maxx.com', pass: 'salesadmin@123', name: 'Sales Administrator', role: 'sales_admin' },
       { email: 'salesman@ganga-maxx.com', pass: 'salesman@123', name: 'Field Sales Agent', role: 'salesman' },
       { email: 'warehouse@ganga-maxx.com', pass: 'warehouse@123', name: 'Warehouse Manager', role: 'warehouse_staff' },
       { email: 'accounts@ganga-maxx.com', pass: 'accounts@123', name: 'Accounts Manager', role: 'accounts_manager' },
       { email: 'compliance@ganga-maxx.com', pass: 'compliance@123', name: 'Compliance Officer', role: 'compliance_admin' },
-      { email: 'salesadmin@ganga-maxx.com', pass: 'salesadmin@123', name: 'Sales Administrator', role: 'sales_admin' },
+      { email: 'dealer@ganga-maxx.com', pass: 'dealer@123', name: 'Dealer Distributor', role: 'dealer' },
+      { email: 'manager@ganga-maxx.com', pass: 'manager@123', name: 'Facility Manager', role: 'field_staff' },
     ];
 
     // ── Hardcoded admin login check (credentials from .env) ────────────
@@ -264,7 +265,7 @@ router.get('/me', async (req, res) => {
     }
 
     // ── Check seed portal users (persist login without DB) ────────
-    const SEED_IDS = ['user_field_staff', 'user_dealer', 'user_salesman', 'user_warehouse_staff', 'user_accounts_manager', 'user_compliance_admin', 'user_sales_admin'];
+    const SEED_IDS = ['user_admin', 'user_field_staff', 'user_dealer', 'user_salesman', 'user_warehouse_staff', 'user_accounts_manager', 'user_compliance_admin', 'user_sales_admin'];
     if (SEED_IDS.includes(decoded.uid)) {
       return res.json({
         success: true, authenticated: true,
