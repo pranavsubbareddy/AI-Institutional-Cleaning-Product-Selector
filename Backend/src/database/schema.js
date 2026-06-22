@@ -1048,10 +1048,18 @@ async function queryAll(sql, params = []) {
     reloadFromDiskIfChanged();
     return memQueryAll(sql, params);
   }
-  const p = getPool();
-  // Use query() instead of execute() for params like LIMIT/OFFSET that prepared stmts don't support
-  const [rows] = await p.query(sql, params);
-  return rows;
+  try {
+    const p = getPool();
+    // Use query() instead of execute() for params like LIMIT/OFFSET that prepared stmts don't support
+    const [rows] = await p.query(sql, params);
+    return rows;
+  } catch (err) {
+    console.warn('[DB] MySQL query failed, falling back to in-memory engine:', err.message);
+    // Disable the pool so subsequent queries don't retry MySQL and fail again
+    pool = null;
+    reloadFromDiskIfChanged();
+    return memQueryAll(sql, params);
+  }
 }
 
 async function queryOne(sql, params = []) {
@@ -1064,9 +1072,17 @@ async function run(sql, params = []) {
     reloadFromDiskIfChanged();
     return memQueryAll(sql, params);
   }
-  const p = getPool();
-  const [result] = await p.execute(sql, params);
-  return result;
+  try {
+    const p = getPool();
+    const [result] = await p.execute(sql, params);
+    return result;
+  } catch (err) {
+    console.warn('[DB] MySQL run failed, falling back to in-memory engine:', err.message);
+    // Disable the pool so subsequent queries don't retry MySQL and fail again
+    pool = null;
+    reloadFromDiskIfChanged();
+    return memQueryAll(sql, params);
+  }
 }
 
 async function closePool() {
