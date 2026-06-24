@@ -74,8 +74,12 @@ export default function Recommendations() {
       const computedTotal = items.reduce((s, it) => s + Number(it.monthly_cost || 0), 0);
       const totalCost = computedTotal > 0 ? computedTotal : (data.total_estimated_cost || 0);
 
+      const safeInstName = escapeHtml(instName);
+      const safeSummary = data.summary ? escapeHtml(data.summary) : null;
+      const safeFinancialAlert = data.financialStatusAlert ? escapeHtml(data.financialStatusAlert) : null;
+      const safeInstType = escapeHtml((data.institution_type || '').replace(/_/g, ' '));
       const html = `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Quotation - ${instName}</title>
+<html><head><meta charset="utf-8"><title>Quotation - ${safeInstName}</title>
 <style>
   * { box-sizing: border-box; }
   body {
@@ -252,13 +256,13 @@ export default function Recommendations() {
       <div class="doc-info">
         <h2>Product Quotation</h2>
         <div class="date">Date: ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
-        <div class="date" style="margin-top:2px;">Ref: QTN-${instName.substring(0, 4).toUpperCase()}-${Date.now().toString().slice(-6)}</div>
+        <div class="date" style="margin-top:2px;">Ref: QTN-${safeInstName.substring(0, 4).toUpperCase()}-${Date.now().toString().slice(-6)}</div>
       </div>
     </div>
 
     <div class="summary-grid">
-      <div class="summary-box"><div class="lbl">Facility</div><div class="val">${instName}</div></div>
-      <div class="summary-box"><div class="lbl">Type</div><div class="val" style="text-transform:capitalize;">${(data.institution_type || '').replace(/_/g, ' ')}</div></div>
+      <div class="summary-box"><div class="lbl">Facility</div><div class="val">${safeInstName}</div></div>
+      <div class="summary-box"><div class="lbl">Type</div><div class="val" style="text-transform:capitalize;">${safeInstType}</div></div>
       <div class="summary-box"><div class="lbl">Area</div><div class="val">${data.area_size ? Number(data.area_size).toLocaleString() + ' sq.ft' : '-'}</div></div>
       <div class="summary-box"><div class="lbl">Monthly Cost</div><div class="val accent">Rs ${totalCost.toLocaleString('en-IN')}</div></div>
     </div>
@@ -286,14 +290,14 @@ export default function Recommendations() {
       </tfoot>
     </table>
 
-    ${data.summary ? `<div class="summary-section">
+    ${safeSummary ? `<div class="summary-section">
       <div class="section-title">Summary</div>
-      <div class="section-text">${data.summary}</div>
+      <div class="section-text">${safeSummary}</div>
     </div>` : ''}
 
-    ${data.financialStatusAlert ? `<div class="summary-section" style="border-color:#fde68a;background:#fffbeb;">
+    ${safeFinancialAlert ? `<div class="summary-section" style="border-color:#fde68a;background:#fffbeb;">
       <div class="section-title" style="color:#d97706;">Financial Notice</div>
-      <div class="section-text" style="color:#92400e;">${data.financialStatusAlert}</div>
+      <div class="section-text" style="color:#92400e;">${safeFinancialAlert}</div>
     </div>` : ''}
 
     <div class="footer">
