@@ -309,16 +309,24 @@ router.post('/process', validateProcessBody, async (req, res, next) => {
           safety_notes: item.safety_notes
         }
       );
+      const aiCoveragePerUnit = item.coverage_per_unit || 0;
+      const productAlerts = item.alerts && Array.isArray(item.alerts) && item.alerts.length > 0
+        ? JSON.stringify(item.alerts)
+        : null;
       await run(
         `INSERT INTO recommendation_items
          (id, recommendation_id, product_id, product_name, quantity_estimate, dilution_ratio,
-          monthly_cost, unit_price, usage_frequency, priority, usage_guidance, safety_notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Monthly', ?, ?, ?)`,
+          monthly_cost, unit_price, coverage_per_unit, alerts, usage_frequency, priority, usage_guidance, safety_notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Monthly', ?, ?, ?)`,
         [
           lineId, recId, productId,
           item.name || 'AI-Generated Product',
           item.estimated_monthly_qty_units, item.recommended_dilution,
-          item.calculated_cost, aiUnitPrice, 1,
+          // Verify calculated_cost matches unit_price * quantity
+          (item.unit_price && item.estimated_monthly_qty_units
+            ? item.unit_price * item.estimated_monthly_qty_units
+            : item.calculated_cost),
+          aiUnitPrice, aiCoveragePerUnit, productAlerts, 1,
           item.usage_guidance || null,
           item.safety_notes || null
         ]
@@ -376,18 +384,23 @@ router.post('/process', validateProcessBody, async (req, res, next) => {
               ? Math.round((dbItem.monthly_cost || 0) / dbItem.quantity_estimate)
               : 0);
           return {
-            ...dbItem,
-            unit_price: itemUnitPrice,
-            base_price: dbItem.base_price || itemUnitPrice,
-            product_name: dbItem.product_name
+            ...dbItem,          unit_price: itemUnitPrice,
+          base_price: dbItem.base_price || itemUnitPrice,
+          coverage_per_unit: dbItem.coverage_per_unit
+            || aiMatch?.coverage_per_unit
+            || 0,
+          product_name: dbItem.product_name
               || aiMatch?.name
               || 'Unknown Product',
-            usage_guidance: dbItem.usage_guidance
+          usage_guidance: dbItem.usage_guidance
               || aiMatch?.usage_guidance
               || null,
-            safety_notes: dbItem.safety_notes
+          safety_notes: dbItem.safety_notes
               || aiMatch?.safety_notes
-              || null
+              || null,
+          alerts: dbItem.alerts
+            ? (typeof dbItem.alerts === 'string' ? safeJsonParse(dbItem.alerts, []) : dbItem.alerts)
+            : aiMatch?.alerts || []
           };
         })
       : aiResult.recommendations.map(r => ({
@@ -581,7 +594,10 @@ router.get('/:id', async (req, res, next) => {
           unit: product?.unit || 'litre',
           coverage_per_unit: product?.coverage_per_unit || 0,
           unit_price: itemUnitPrice,
-          base_price: product?.unit_price || itemUnitPrice
+          base_price: product?.unit_price || itemUnitPrice,
+          alerts: item.alerts
+            ? (typeof item.alerts === 'string' ? safeJsonParse(item.alerts, []) : item.alerts)
+            : []
         };
       });
     }

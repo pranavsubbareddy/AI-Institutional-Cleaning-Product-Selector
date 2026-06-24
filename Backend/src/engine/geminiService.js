@@ -6,20 +6,24 @@ const RecommendationSchema = z.object({
   recommendations: z
     .array(
       z.object({
-        productId: z.string().describe('Unique product ID (generate your own, e.g., AI-PROD-001)'),
-        sku: z.string().describe('Product SKU code (generate your own)'),
-        name: z.string().describe('Real institutional cleaning product name with brand'),
-        recommended_dilution: z.string().describe('Dilution ratio or "Ready to use"'),
-        estimated_monthly_qty_units: z.number().describe('Estimated monthly quantity in units'),
-        calculated_cost: z.number().describe('Calculated monthly cost in INR'),
-        usage_guidance: z.string().describe('How to use the product'),
+        productId: z.string().describe('Unique product ID'),
+        sku: z.string().describe('Product SKU'),
+        name: z.string().describe('Product name with brand'),
+        category: z.string().optional().default('General').describe('Product category'),
+        recommended_dilution: z.string().describe('Dilution ratio or Ready to use'),
+        estimated_monthly_qty_units: z.number().describe('Monthly qty in litres/kg'),
+        unit_price: z.number().optional().default(0).describe('Price per unit in INR'),
+        calculated_cost: z.number().describe('Monthly cost = unit_price x qty'),
+        coverage_per_unit: z.number().optional().default(0).describe('Coverage in sq.ft per unit'),
+        usage_guidance: z.string().describe('Usage instructions'),
         safety_notes: z.string().describe('Safety precautions'),
+        alerts: z.array(z.string()).optional().default([]).describe('Safety/usage alerts (e.g., Requires PPE, Flammable, Corrosive)'),
       })
     )
-    .describe('Array of recommended products — recommend 4-10 most relevant products'),
+    .describe('Array of 4-10 recommended products'),
   summary: z.object({
-    grossAggregatedCost: z.number().describe('Total monthly cost of all recommended products in INR'),
-    financialStatusAlert: z.string().nullable().describe('Budget/financial alert message or null'),
+    grossAggregatedCost: z.number().describe('Total monthly cost in INR'),
+    financialStatusAlert: z.string().nullable().describe('Budget/financial alert or null'),
   }),
 });
 
@@ -243,19 +247,38 @@ function buildPrompt(params, catalog) {
   const hygiene = params.hygiene_standard || 'Standard';
   const budget = params.budget || 'Medium';
   const instType = params.institution_type || 'Facility';
+  const occupants = meta.occupants || 'Unknown';
+  const frequency = meta.cleaning_frequency || 'daily';
+  const preferences = (meta.preferences || []).join(', ') || 'None';
+  const specialReqs = meta.special_requirements || 'None';
 
-  return `You are a cleaning product procurement expert. Recommend 4-10 distinct cleaning products for this Indian facility.
+  return `You are an expert institutional cleaning consultant for India. Based on the facility details below, recommend 4-8 most suitable cleaning products with correct pricing.
 
-TYPE: ${instType}
+FACILITY: ${instType}
 AREA: ${area}
 SURFACES: ${surfaces}
 HYGIENE: ${hygiene}
 BUDGET: ${budget}
+OCCUPANTS: ${occupants}
+FREQUENCY: ${frequency}
+EQUIPMENT: ${equipment}
+PREFERENCES: ${preferences}
+SPECIAL: ${specialReqs}
 
-For each: productId (e.g. REC-001), sku, name (use real Indian brands like Diversey, Savo, Vim, Lizol, Domex, Colin), recommended_dilution, estimated_monthly_qty_units, calculated_cost (INR), usage_guidance, safety_notes
+Calculate CORRECTLY:
+- Quantity: based on area, frequency, and surface type
+- Price: realistic Indian market rate for the product type
+- Monthly Cost = Unit Price x Quantity (must be exact!)
+- Coverage: sq.ft per unit based on product type
 
-Respond ONLY with valid JSON matching this schema:
-{"recommendations":[{"productId":"","sku":"","name":"","recommended_dilution":"","estimated_monthly_qty_units":0,"calculated_cost":0,"usage_guidance":"","safety_notes":""}],"summary":{"grossAggregatedCost":0,"financialStatusAlert":null}}`;
+Use real Indian brands (e.g., Diversey, Savo, Vim, Lizol, Domex, Colin, Harpic, Mr. Muscle, Pril, Jyothy Labs, Godrej, Cif, Exo).
+
+Products should match the facility type (${instType}), budget (${budget}), hygiene level (${hygiene}), and surfaces (${surfaces}).
+
+IMPORTANT: For each product, generate relevant safety alerts/warnings based on its chemical properties (e.g., "Requires gloves", "Use in ventilated area", "Corrosive", "Flammable", "Avoid skin contact", "Keep sealed when not in use").
+
+Respond ONLY with valid JSON matching this exact schema:
+{"recommendations":[{"productId":"","sku":"","name":"","category":"","recommended_dilution":"","estimated_monthly_qty_units":0,"unit_price":0,"calculated_cost":0,"coverage_per_unit":0,"usage_guidance":"","safety_notes":"","alerts":["Alert 1","Alert 2"]}],"summary":{"grossAggregatedCost":0,"financialStatusAlert":null}}`;
 }
 
 function getCatalogForPrompt() {

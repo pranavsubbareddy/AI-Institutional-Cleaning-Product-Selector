@@ -261,9 +261,19 @@ function AdminHome({ overview, ops }) {
   );
 }
 
+// ── Time-based greeting helper ──────────────────────────────────────────
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return { text: 'Good Morning', icon: '🌅' };
+  if (hour < 17) return { text: 'Good Afternoon', icon: '☀️' };
+  if (hour < 21) return { text: 'Good Evening', icon: '🌆' };
+  return { text: 'Good Night', icon: '🌙' };
+}
+
 // ── User Home View ────────────────────────────────────────────────────────
 function UserHome({ stats, user }) {
   const navigate = useNavigate();
+  const greeting = getGreeting();
   const userCards = [
     { to: '/dashboard', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z', label: 'My Dashboard', desc: 'Track facilities, recommendations & costs', color: 'emerald' },
     { to: '/profile', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', label: 'My Profile', desc: 'Manage your account settings', color: 'purple' },
@@ -283,7 +293,7 @@ function UserHome({ stats, user }) {
           </svg>
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-surface-100">Welcome back, {user?.displayName || 'User'}</h1>
+          <h1 className="text-2xl font-bold text-surface-100">{greeting.text}, {user?.displayName || 'User'} {greeting.icon}</h1>
           <p className="text-sm text-surface-400">Manage your facilities and cleaning recommendations</p>
         </div>
       </div>
@@ -397,7 +407,7 @@ export default function Home() {
         <footer className="max-w-5xl mx-auto px-4 py-6 border-t border-surface-700/50 mt-8">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-surface-500">
             <p>&copy; {new Date().getFullYear()} Ganga Maxx Marketplace. All rights reserved.</p>
-            <p>Welcome, {user?.displayName || 'User'}</p>
+            <p>{getGreeting().text}, {user?.displayName || 'User'} {getGreeting().icon}</p>
           </div>
         </footer>
       </div>

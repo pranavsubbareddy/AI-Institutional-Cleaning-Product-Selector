@@ -944,6 +944,12 @@ async function initializeSchema() {
   try {
     await pool.execute('ALTER TABLE recommendation_items ADD COLUMN unit_price DECIMAL(10,2) DEFAULT 0 AFTER monthly_cost');
   } catch (e) { /* Column may already exist */ }
+  try {
+    await pool.execute('ALTER TABLE recommendation_items ADD COLUMN coverage_per_unit DECIMAL(10,2) DEFAULT 0 AFTER unit_price');
+  } catch (e) { /* Column may already exist */ }
+  try {
+    await pool.execute('ALTER TABLE recommendation_items ADD COLUMN alerts TEXT AFTER coverage_per_unit');
+  } catch (e) { /* Column may already exist */ }
 
   // Widen dilution_ratio columns to accommodate AI-generated values (safe if already widened)
   try {

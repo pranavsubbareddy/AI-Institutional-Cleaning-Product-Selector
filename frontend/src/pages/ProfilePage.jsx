@@ -8,7 +8,7 @@ export default function ProfilePage() {
   const navigate = useNavigate();
 
   const [editing, setEditing] = useState(false);
-  const [phone, setPhone] = useState(user?.phoneNumber || '');
+  const [phone, setPhone] = useState(user?.phone || '');
   const [age, setAge] = useState(user?.age ? String(user.age) : '');
   const [gender, setGender] = useState(user?.gender || '');
   const [saving, setSaving] = useState(false);

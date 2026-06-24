@@ -49,65 +49,289 @@ export default function Recommendations() {
     });
   };
 
-  // Emoji to SVG map for professional PDF rendering
-  const emojiSvgMap = {
-    '🌿': '<svg viewBox="0 0 20 20" width="16" height="16" style="display:inline;vertical-align:middle;margin-right:2px"><path fill="#10b981" d="M10 2C6 2 2 6 2 10s4 8 8 8 8-4 8-8-4-8-8-8z"/><path fill="#34d399" d="M10 5l-2 5 5-2-5-2z"/></svg>',
-    '🚫': '<svg viewBox="0 0 20 20" width="16" height="16" style="display:inline;vertical-align:middle;margin-right:2px"><circle cx="10" cy="10" r="8" fill="none" stroke="#ef4444" stroke-width="1.5"/><path stroke="#ef4444" stroke-width="1.5" d="M6 6l8 8"/></svg>',
-    '🛡️': '<svg viewBox="0 0 20 20" width="16" height="16" style="display:inline;vertical-align:middle;margin-right:2px"><path fill="#6366f1" d="M10 2L3 5v5c0 4.4 3 8.5 7 9 4-.5 7-4.6 7-9V5l-7-3z"/></svg>',
-    '⚡': '<svg viewBox="0 0 20 20" width="16" height="16" style="display:inline;vertical-align:middle;margin-right:2px"><path fill="#f59e0b" d="M11.5 2L5 11h4l-1.5 7L14 9h-4l1.5-7z"/></svg>',
-    '💧': '<svg viewBox="0 0 20 20" width="16" height="16" style="display:inline;vertical-align:middle;margin-right:2px"><path fill="#38bdf8" d="M10 2C7 6 5 9.5 5 12c0 2.8 2.2 5 5 5s5-2.2 5-5c0-2.5-2-6-5-10z"/></svg>',
-    '🏭': '<svg viewBox="0 0 20 20" width="16" height="16" style="display:inline;vertical-align:middle;margin-right:2px"><path fill="#78716c" d="M3 18V8l4 3V8l4 3V8l4 3v7H3z"/><rect fill="#a8a29e" x="5" y="13" width="2" height="3" rx="0.5"/><rect fill="#a8a29e" x="9" y="13" width="2" height="3" rx="0.5"/><rect fill="#a8a29e" x="13" y="13" width="2" height="3" rx="0.5"/><path fill="#57534e" d="M2 18h16v1H2z"/></svg>',
-    '✅': '<svg viewBox="0 0 20 20" width="16" height="16" style="display:inline;vertical-align:middle;margin-right:2px"><circle cx="10" cy="10" r="8" fill="#10b981"/><path fill="#fff" d="M7 10.5l2 2 4-4"/></svg>',
-    '🪣': '<svg viewBox="0 0 20 20" width="16" height="16" style="display:inline;vertical-align:middle;margin-right:2px"><path fill="#60a5fa" d="M4 12l2 6h8l2-6H4z"/><rect fill="#94a3b8" x="8" y="3" width="4" height="4" rx="1"/></svg>',
-    '⚠': '<svg viewBox="0 0 20 20" width="16" height="16" style="display:inline;vertical-align:middle;margin-right:2px"><path fill="#f59e0b" d="M10 2L1 18h18L10 2z"/><path fill="#f59e0b" d="M10 8c-.6 0-1 .4-1 1v3c0 .6.4 1 1 1s1-.4 1-1V9c0-.6-.4-1-1-1z"/></svg>',
-    '✓': '<svg viewBox="0 0 16 16" width="14" height="14" style="display:inline;vertical-align:middle;margin-right:1px"><path fill="#10b981" d="M6 10.5l-2.5-2.5L2 9.5 6 13.5 14 5.5 12.5 4z"/></svg>',
-  };
-
-  // Replace emoji in visible DOM temporarily, generate PDF, then restore
   const handleDownloadPDF = async () => {
     if (!contentRef.current || downloading) return;
     setDownloading(true);
-    const restored = [];
     try {
-      // Walk text nodes and replace emoji with SVGs directly in the visible DOM
-      const walker = document.createTreeWalker(contentRef.current, NodeFilter.SHOW_TEXT, null, false);
-      while (walker.nextNode()) {
-        const textNode = walker.currentNode;
-        let text = textNode.textContent;
-        let modified = false;
-        for (const [emoji, svgHtml] of Object.entries(emojiSvgMap)) {
-          if (text.includes(emoji)) {
-            text = text.split(emoji).join(svgHtml);
-            modified = true;
-          }
-        }
-        if (modified) {
-          const span = document.createElement('span');
-          span.innerHTML = text;
-          restored.push({ parent: textNode.parentNode, nextSibling: textNode.nextSibling, oldNode: textNode });
-          textNode.parentNode.replaceChild(span, textNode);
-        }
-      }
+      const escapeHtml = (str) => String(str).replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
+      const instName = data.institution_name || 'Recommendation';
+      const items = data.items || [];
 
-      const fileName = `quotation-${(data.institution_name || 'recommendation').replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}.pdf`;
+      const rowsHtml = items.map((item, i) => {
+        const unitPrice = item.unit_price || item.base_price || 0;
+        const monthlyCost = Number(item.monthly_cost || 0);
+        const dilution = item.dilution_ratio || '-';
+        return `<tr style="${i % 2 === 0 ? 'background-color: #ffffff;' : 'background-color: #f8fafc;'}">
+          <td style="padding:10px 8px;border-bottom:1px solid #e2e8f0;text-align:center;font-size:11px;color:#475569;">${i + 1}</td>
+          <td style="padding:10px 8px;border-bottom:1px solid #e2e8f0;font-size:11px;color:#1e293b;font-weight:500;">${escapeHtml(item.product_name || 'Product')}</td>
+          <td style="padding:10px 8px;border-bottom:1px solid #e2e8f0;text-align:center;font-size:11px;color:#475569;">${item.quantity_estimate || 0}</td>
+          <td style="padding:10px 8px;border-bottom:1px solid #e2e8f0;text-align:center;font-size:11px;color:#475569;">${dilution}</td>
+          <td style="padding:10px 8px;border-bottom:1px solid #e2e8f0;text-align:right;font-size:11px;color:#475569;">Rs ${Number(unitPrice).toLocaleString('en-IN')}</td>
+          <td style="padding:10px 8px;border-bottom:1px solid #e2e8f0;text-align:right;font-size:11px;color:#059669;font-weight:600;">Rs ${monthlyCost.toLocaleString('en-IN')}</td>
+        </tr>`;
+      }).join('');
+
+      const computedTotal = items.reduce((s, it) => s + Number(it.monthly_cost || 0), 0);
+      const totalCost = computedTotal > 0 ? computedTotal : (data.total_estimated_cost || 0);
+
+      const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Quotation - ${instName}</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    background: #ffffff;
+    color: #334155;
+    margin: 0;
+    padding: 0;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .page {
+    max-width: 190mm;
+    margin: 0 auto;
+    padding: 24px 28px;
+  }
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding-bottom: 16px;
+    margin-bottom: 20px;
+    border-bottom: 3px solid #0d9488;
+  }
+  .header .brand h1 {
+    font-size: 24px;
+    font-weight: 800;
+    color: #0f766e;
+    margin: 0 0 2px 0;
+    letter-spacing: -0.5px;
+  }
+  .header .brand .tagline {
+    font-size: 10px;
+    color: #64748b;
+    letter-spacing: 0.3px;
+  }
+  .header .doc-info {
+    text-align: right;
+  }
+  .header .doc-info h2 {
+    font-size: 18px;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 4px 0;
+  }
+  .header .doc-info .date {
+    font-size: 10px;
+    color: #64748b;
+  }
+  .summary-grid {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+  .summary-box {
+    background: #f0fdfa;
+    border: 1px solid #ccfbf1;
+    border-radius: 8px;
+    padding: 14px 18px;
+    flex: 1;
+    min-width: 110px;
+  }
+  .summary-box .lbl {
+    font-size: 9px;
+    text-transform: uppercase;
+    color: #64748b;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    margin-bottom: 4px;
+  }
+  .summary-box .val {
+    font-size: 16px;
+    font-weight: 700;
+    color: #0f172a;
+  }
+  .summary-box .val.accent {
+    color: #059669;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  thead th {
+    background: #0f766e;
+    color: #ffffff;
+    padding: 12px 8px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    font-weight: 600;
+    text-align: left;
+  }
+  thead th.right { text-align: right; }
+  thead th.center { text-align: center; }
+  .total-row td {
+    padding: 14px 8px;
+    border-top: 2px solid #0f766e;
+    font-size: 13px;
+    color: #0f172a;
+    font-weight: 700;
+    background: #f0fdfa;
+  }
+  .total-row td.accent {
+    color: #059669;
+    font-size: 15px;
+    text-align: right;
+  }
+  .summary-section {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-top: 16px;
+  }
+  .summary-section .section-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    color: #64748b;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    margin-bottom: 6px;
+  }
+  .summary-section .section-text {
+    color: #0f172a;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .footer {
+    text-align: center;
+    padding-top: 20px;
+    margin-top: 24px;
+    border-top: 1px solid #e2e8f0;
+    font-size: 9px;
+    color: #94a3b8;
+    line-height: 1.6;
+  }
+  .watermark {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-30deg);
+    font-size: 80px;
+    color: rgba(13, 148, 136, 0.04);
+    font-weight: 900;
+    pointer-events: none;
+    z-index: -1;
+    letter-spacing: 10px;
+    overflow: hidden;
+  }
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 600;
+    background: #f0fdfa;
+    color: #0d9488;
+    border: 1px solid #ccfbf1;
+  }
+</style></head><body>
+  <div class="watermark">GANGA MAXX</div>
+
+  <div class="page">
+    <div class="header">
+      <div class="brand">
+        <h1>Ganga Maxx</h1>
+        <div class="tagline">AI Institutional Cleaning Product Selector</div>
+      </div>
+      <div class="doc-info">
+        <h2>Product Quotation</h2>
+        <div class="date">Date: ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
+        <div class="date" style="margin-top:2px;">Ref: QTN-${instName.substring(0, 4).toUpperCase()}-${Date.now().toString().slice(-6)}</div>
+      </div>
+    </div>
+
+    <div class="summary-grid">
+      <div class="summary-box"><div class="lbl">Facility</div><div class="val">${instName}</div></div>
+      <div class="summary-box"><div class="lbl">Type</div><div class="val" style="text-transform:capitalize;">${(data.institution_type || '').replace(/_/g, ' ')}</div></div>
+      <div class="summary-box"><div class="lbl">Area</div><div class="val">${data.area_size ? Number(data.area_size).toLocaleString() + ' sq.ft' : '-'}</div></div>
+      <div class="summary-box"><div class="lbl">Monthly Cost</div><div class="val accent">Rs ${totalCost.toLocaleString('en-IN')}</div></div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th class="center" style="width:30px;">#</th>
+          <th>Product Name</th>
+          <th class="center" style="width:55px;">Qty</th>
+          <th class="center" style="width:85px;">Dilution</th>
+          <th class="right" style="width:80px;">Unit Price</th>
+          <th class="right" style="width:85px;">Monthly Cost</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rowsHtml || '<tr><td colspan="6" style="text-align:center;padding:24px;color:#94a3b8;font-size:12px;">No products in this quotation.</td></tr>'}
+      </tbody>
+      <tfoot>
+        <tr class="total-row">
+          <td colspan="4">Total Monthly Estimate (${items.length} product${items.length !== 1 ? 's' : ''})</td>
+          <td class="right"></td>
+          <td class="accent">Rs ${totalCost.toLocaleString('en-IN')}</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    ${data.summary ? `<div class="summary-section">
+      <div class="section-title">Summary</div>
+      <div class="section-text">${data.summary}</div>
+    </div>` : ''}
+
+    ${data.financialStatusAlert ? `<div class="summary-section" style="border-color:#fde68a;background:#fffbeb;">
+      <div class="section-title" style="color:#d97706;">Financial Notice</div>
+      <div class="section-text" style="color:#92400e;">${data.financialStatusAlert}</div>
+    </div>` : ''}
+
+    <div class="footer">
+      <div><strong>Ganga Maxx</strong> &mdash; AI Institutional Cleaning Product Selector</div>
+      <div>This quotation was generated by our AI engine based on your facility profile.</div>
+      <div style="margin-top:4px;">Generated on ${new Date().toLocaleString('en-IN')} &bull; Valid for 30 days</div>
+    </div>
+  </div>
+</body></html>`;
+
+      const container = document.createElement('div');
+      container.innerHTML = html;
+      container.style.position = 'absolute';
+      container.style.left = '-9999px';
+      container.style.top = '0';
+      container.style.width = '794px';
+      document.body.appendChild(container);
+
+      const fileName = `quotation-${instName.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}.pdf`;
       const opt = {
-        margin: [8, 8, 8, 8],
+        margin: [0, 0, 0, 0],
         filename: fileName,
-        image: { type: 'jpeg', quality: 0.95 },
+        image: { type: 'jpeg', quality: 0.98 },
         html2canvas: {
           scale: 2,
           useCORS: true,
           allowTaint: true,
           letterRendering: true,
-          backgroundColor: '#0f172a',
-          width: contentRef.current.scrollWidth,
-          windowWidth: contentRef.current.scrollWidth,
+          backgroundColor: '#ffffff',
+          width: 794,
           logging: false
         },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: 'avoid-all' }
+        jsPDF: { unit: 'px', format: [794, 1123], orientation: 'portrait' },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
       };
-      await html2pdf().set(opt).from(contentRef.current).save();
+
+      await html2pdf().set(opt).from(container).save();
+      document.body.removeChild(container);
       setToast({ type: 'success', message: 'PDF downloaded successfully!' });
       setTimeout(() => setToast(null), 5000);
     } catch (err) {
@@ -115,14 +339,6 @@ export default function Recommendations() {
       setToast({ type: 'error', message: 'Failed to generate PDF. Please try again.' });
       setTimeout(() => setToast(null), 5000);
     } finally {
-      // Restore all original text nodes
-      for (const { parent, nextSibling, oldNode } of restored) {
-        if (nextSibling) {
-          parent.insertBefore(oldNode, nextSibling);
-        } else {
-          parent.appendChild(oldNode);
-        }
-      }
       setDownloading(false);
     }
   };
