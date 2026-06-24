@@ -64,6 +64,7 @@ export default function Recommendations() {
         return `<tr style="${i % 2 === 0 ? 'background-color: #ffffff;' : 'background-color: #f8fafc;'}">
           <td style="padding:10px 8px;border-bottom:1px solid #e2e8f0;text-align:center;font-size:11px;color:#475569;">${i + 1}</td>
           <td style="padding:10px 8px;border-bottom:1px solid #e2e8f0;font-size:11px;color:#1e293b;font-weight:500;">${escapeHtml(item.product_name || 'Product')}</td>
+          <td style="padding:10px 8px;border-bottom:1px solid #e2e8f0;text-align:center;font-size:11px;color:#475569;">${escapeHtml(item.category || '-')}</td>
           <td style="padding:10px 8px;border-bottom:1px solid #e2e8f0;text-align:center;font-size:11px;color:#475569;">${item.quantity_estimate || 0}</td>
           <td style="padding:10px 8px;border-bottom:1px solid #e2e8f0;text-align:center;font-size:11px;color:#475569;">${dilution}</td>
           <td style="padding:10px 8px;border-bottom:1px solid #e2e8f0;text-align:right;font-size:11px;color:#475569;">Rs ${Number(unitPrice).toLocaleString('en-IN')}</td>
@@ -244,6 +245,17 @@ export default function Recommendations() {
     color: #0d9488;
     border: 1px solid #ccfbf1;
   }
+  .safety-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 9px;
+    font-weight: 600;
+    background: #fef2f2;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+    margin: 1px 3px 1px 0;
+  }
 </style></head><body>
   <div class="watermark">GANGA MAXX</div>
 
@@ -272,6 +284,7 @@ export default function Recommendations() {
         <tr>
           <th class="center" style="width:30px;">#</th>
           <th>Product Name</th>
+          <th class="center" style="width:75px;">Category</th>
           <th class="center" style="width:55px;">Qty</th>
           <th class="center" style="width:85px;">Dilution</th>
           <th class="right" style="width:80px;">Unit Price</th>
@@ -279,16 +292,29 @@ export default function Recommendations() {
         </tr>
       </thead>
       <tbody>
-        ${rowsHtml || '<tr><td colspan="6" style="text-align:center;padding:24px;color:#94a3b8;font-size:12px;">No products in this quotation.</td></tr>'}
+        ${rowsHtml || '<tr><td colspan="7" style="text-align:center;padding:24px;color:#94a3b8;font-size:12px;">No products in this quotation.</td></tr>'}
       </tbody>
       <tfoot>
         <tr class="total-row">
-          <td colspan="4">Total Monthly Estimate (${items.length} product${items.length !== 1 ? 's' : ''})</td>
+          <td colspan="5">Total Monthly Estimate (${items.length} product${items.length !== 1 ? 's' : ''})</td>
           <td class="right"></td>
           <td class="accent">Rs ${totalCost.toLocaleString('en-IN')}</td>
         </tr>
       </tfoot>
     </table>
+
+    ${items.some(item => item.alerts && Array.isArray(item.alerts) && item.alerts.length > 0) ? `<div class="summary-section" style="border-color:#fecaca;background:#fef2f2;">
+      <div class="section-title" style="color:#dc2626;">⚠ Safety & Handling Alerts</div>
+      ${items.filter(item => item.alerts && Array.isArray(item.alerts) && item.alerts.length > 0).map(item => {
+        const safeName = escapeHtml(item.product_name || 'Product');
+        const alertBadges = item.alerts.map(a => `<span class="safety-badge">${escapeHtml(a)}</span>`).join(' ');
+        return `<div style="margin-bottom:6px;padding:6px 0;border-bottom:1px solid #fecaca;">
+          <div style="font-size:11px;font-weight:600;color:#991b1b;margin-bottom:3px;">${safeName}</div>
+          <div>${alertBadges}</div>
+        </div>`;
+      }).join('')}
+      <div style="font-size:9px;color:#b91c1c;margin-top:6px;opacity:0.7;">Refer to product Safety Data Sheet (SDS) for complete safety information.</div>
+    </div>` : ''}
 
     ${safeSummary ? `<div class="summary-section">
       <div class="section-title">Summary</div>
