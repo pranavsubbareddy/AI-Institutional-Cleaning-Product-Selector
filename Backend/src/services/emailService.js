@@ -134,7 +134,55 @@ async function sendWelcomeEmail(email, displayName) {
   }
 }
 
-// ── Send Password Reset Email ─────────────────────────────────────────
+// ── Send Password Reset OTP Email ───────────────────────────────────────
+async function sendPasswordResetOTPEmail(email, displayName, otp) {
+  const client = ensureClient();
+  if (!client) return { success: false, skipped: true };
+
+  try {
+    const { data, error } = await client.emails.send({
+      from: `${APP_NAME} <${FROM_EMAIL}>`,
+      to: email,
+      subject: `Your password reset OTP - ${APP_NAME}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"></head>
+        <body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8fafc;">
+          <div style="max-width:560px;margin:0 auto;padding:24px;">
+            <div style="background:linear-gradient(135deg,#06b6d4,#10b981);padding:32px;border-radius:12px 12px 0 0;text-align:center;">
+              <h1 style="color:#fff;margin:0;font-size:22px;">${APP_NAME}</h1>
+            </div>
+            <div style="background:#fff;padding:32px 24px;border-radius:0 0 12px 12px;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+              <h2 style="color:#1e293b;font-size:20px;margin:0 0 8px;">Hi ${displayName},</h2>
+              <p style="color:#475569;font-size:15px;line-height:1.6;margin:0 0 12px;">We received a request to reset your password. Use the following OTP code to proceed:</p>
+              <div style="text-align:center;margin:24px 0;">
+                <div style="display:inline-block;background:linear-gradient(135deg,#1e293b,#334155);color:#fff;padding:18px 40px;border-radius:12px;font-size:32px;font-weight:700;letter-spacing:8px;font-family:monospace;">${otp}</div>
+              </div>
+              <p style="color:#475569;font-size:14px;line-height:1.5;margin:0 0 12px;">Enter this OTP on the password reset page to set a new password.</p>
+              <p style="color:#94a3b8;font-size:13px;margin:0 0 4px;">This OTP expires in 10 minutes.</p>
+              <p style="color:#94a3b8;font-size:13px;margin:0;">If you didn't request a password reset, you can safely ignore this email.</p>
+            </div>
+            <p style="text-align:center;color:#94a3b8;font-size:12px;margin-top:16px;">&copy; ${new Date().getFullYear()} Ganga Maxx Marketplace. All rights reserved.</p>
+          </div>
+        </body>
+        </html>
+      `,
+    });
+
+    if (error) {
+      console.error('[Email] Password reset OTP email failed:', error);
+      return { success: false, error: error.message };
+    }
+    console.log('[Email] Password reset OTP email sent to', email);
+    return { success: true, id: data?.id };
+  } catch (err) {
+    console.error('[Email] Password reset OTP email error:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+// ── Send Password Reset Email (legacy link-based) ─────────────────────────
 async function sendPasswordResetEmail(email, displayName, token) {
   const client = ensureClient();
   if (!client) return { success: false, skipped: true };
@@ -335,6 +383,7 @@ module.exports = {
   sendVerificationEmail,
   sendWelcomeEmail,
   sendSignupConfirmationEmail,
+  sendPasswordResetOTPEmail,
   sendPasswordResetEmail,
   sendLoginNotificationEmail,
   sendGoogleWelcomeEmail,

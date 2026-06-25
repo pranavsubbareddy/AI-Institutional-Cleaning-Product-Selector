@@ -293,9 +293,15 @@ export default function Login() {
 
             {/* Forgot Password - login mode only */}
             {mode === 'login' && (
-              <div className="flex justify-end">
-                <Link to="/forgot-password" className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors font-medium">
-                  Forgot password?
+              <div className="flex justify-end items-center gap-1.5 mt-1">
+                <Link
+                  to="/forgot-password"
+                  className="group flex items-center gap-1.5 text-sm text-cyan-400 hover:text-cyan-300 transition-all duration-200 font-medium"
+                >
+                  <svg className="w-3.5 h-3.5 opacity-70 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                  </svg>
+                  <span>Forgot password?</span>
                 </Link>
               </div>
             )}

@@ -3,8 +3,8 @@ import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 
 export default function ResetPassword() {
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
   const emailParam = searchParams.get('email');
 
@@ -32,7 +32,7 @@ export default function ResetPassword() {
           setDisplayName(res.data.displayName);
           setValid(true);
         } else {
-          setError(res.error || 'Invalid or expired reset link');
+          setError(res.error || 'Invalid or expired reset link. Please use the OTP method instead.');
         }
       })
       .catch(err => setError(err.message || 'Failed to validate reset link'))
@@ -96,8 +96,8 @@ export default function ResetPassword() {
                 </svg>
               </div>
               <p className="text-red-400 text-sm mb-4">{error}</p>
-              <Link to="/forgot-password" className="text-sm text-cyan-400 hover:text-cyan-300 font-medium transition-colors">
-                Request a new reset link
+              <Link to="/forgot-password" className="inline-block px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-emerald-600 text-white font-semibold hover:from-cyan-500 hover:to-emerald-500 transition-all text-sm">
+                Use OTP Method
               </Link>
             </div>
           ) : done ? (
@@ -130,6 +130,18 @@ export default function ResetPassword() {
             </form>
           )}
         </div>
+
+        {/* Footer */}
+        <p className="text-center mt-6">
+          <Link to="/forgot-password" className="text-sm text-cyan-400 hover:text-cyan-300 font-medium transition-colors">
+            <span className="flex items-center justify-center gap-1">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Back to Forgot Password
+            </span>
+          </Link>
+        </p>
       </div>
     </div>
   );

@@ -4,12 +4,14 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const crypto = require('crypto');
+const rateLimit = require('express-rate-limit');
 const { generateToken, COOKIE_OPTIONS, JWT_SECRET } = require('../middleware/auth');
 const { queryOne, run } = require('../database/schema');
 const {
   sendVerificationEmail,
   sendWelcomeEmail,
   sendSignupConfirmationEmail,
+  sendPasswordResetOTPEmail,
   sendPasswordResetEmail,
   sendLoginNotificationEmail,
   sendGoogleWelcomeEmail,
@@ -398,8 +400,40 @@ router.post('/verify-email', async (req, res) => {
   }
 });
 
+// ── Rate limiters ──────────────────────────────────────────────────────────────
+// Forgot-password: max 3 requests per 15 minutes per IP (prevents OTP spamming)
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 3,
+  message: () => ({
+    success: false,
+    error: 'Too many password reset requests. Please try again in 15 minutes.',
+    timestamp: new Date().toISOString()
+  }),
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Verify OTP: max 5 requests per 15 minutes per IP (prevents brute force)
+const verifyOTPLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: () => ({
+    success: false,
+    error: 'Too many OTP verification attempts. Please try again in 15 minutes.',
+    timestamp: new Date().toISOString()
+  }),
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// ── Helper: generate a 6-digit OTP ────────────────────────────────────────
+function generateOTP() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
 // ── POST /forgot-password ───────────────────────────────────────────────────────
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
   try {
     const { email } = req.body;
 
@@ -414,30 +448,99 @@ router.post('/forgot-password', async (req, res) => {
     if (!record) {
       return res.json({
         success: true,
-        message: 'If an account with that email exists, a password reset link has been sent.',
+        message: 'If an account with that email exists, a password reset OTP has been sent.',
         timestamp: new Date().toISOString()
       });
     }
 
-    const resetToken = generateRandomToken();
-    // Use ISO string for consistent timezone handling across MySQL and JS
-    const resetExpires = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    // For seed/portal users, return the OTP directly in the response
+    // so they can test without email configuration
+    const SEED_EMAILS = [
+      'admin@ganga-maxx.com',
+      'salesadmin@ganga-maxx.com',
+      'salesman@ganga-maxx.com',
+      'warehouse@ganga-maxx.com',
+      'accounts@ganga-maxx.com',
+      'compliance@ganga-maxx.com',
+      'dealer@ganga-maxx.com',
+      'manager@ganga-maxx.com'
+    ];
+    const isSeedUser = SEED_EMAILS.includes(normalizedEmail);
+
+    const otp = generateOTP();
+    // OTP expires in 10 minutes
+    const resetExpires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
     await run(
       'UPDATE users SET resetPasswordToken = ?, resetPasswordExpires = ? WHERE email = ?',
-      [resetToken, resetExpires, normalizedEmail]
+      [otp, resetExpires, normalizedEmail]
     ).catch(() => {});
 
-    await sendPasswordResetEmail(record.email, record.displayName, resetToken);
+    await sendPasswordResetOTPEmail(record.email, record.displayName, otp);
+
+    // If it's a seed user without email config, return the OTP in the response for testing
+    if (isSeedUser && !process.env.RESEND_API_KEY) {
+      return res.json({
+        success: true,
+        message: 'A password reset OTP has been sent to your email.',
+        data: { otp }, // Only returned for seed users when email is not configured
+        timestamp: new Date().toISOString()
+      });
+    }
 
     res.json({
       success: true,
-      message: 'If an account with that email exists, a password reset link has been sent.',
+      message: 'If an account with that email exists, a password reset OTP has been sent.',
       timestamp: new Date().toISOString()
     });
   } catch (err) {
     console.error('[Auth] Forgot password failed:', err);
     res.status(500).json({ success: false, error: 'Failed to process request', timestamp: new Date().toISOString() });
+  }
+});
+
+// ── POST /verify-reset-otp ───────────────────────────────────────────────────
+router.post('/verify-reset-otp', verifyOTPLimiter, async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({ success: false, error: 'Email and OTP are required', timestamp: new Date().toISOString() });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const record = await queryOne(
+      'SELECT * FROM users WHERE email = ? AND resetPasswordToken = ?',
+      [normalizedEmail, otp]
+    ).catch(() => null);
+
+    if (!record) {
+      return res.status(400).json({ success: false, error: 'Invalid or expired OTP. Please request a new one.', timestamp: new Date().toISOString() });
+    }
+
+    if (new Date(record.resetPasswordExpires) < new Date()) {
+      return res.status(400).json({ success: false, error: 'OTP has expired. Please request a new one.', timestamp: new Date().toISOString() });
+    }
+
+    // Generate a temporary verification token for the password reset step
+    const verificationToken = generateRandomToken();
+    // Store the verification token (overwrites the OTP) with a short 5-min expiry
+    const verificationExpires = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+
+    await run(
+      'UPDATE users SET resetPasswordToken = ?, resetPasswordExpires = ? WHERE email = ?',
+      [verificationToken, verificationExpires, normalizedEmail]
+    ).catch(() => {});
+
+    res.json({
+      success: true,
+      message: 'OTP verified successfully.',
+      data: { email: normalizedEmail, displayName: record.displayName, verificationToken },
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('[Auth] Verify reset OTP failed:', err);
+    res.status(500).json({ success: false, error: 'Failed to verify OTP', timestamp: new Date().toISOString() });
   }
 });
 
@@ -480,7 +583,7 @@ router.post('/reset-password', async (req, res) => {
     const { token, email, newPassword } = req.body;
 
     if (!token || !email || !newPassword) {
-      return res.status(400).json({ success: false, error: 'Token, email, and new password are required', timestamp: new Date().toISOString() });
+      return res.status(400).json({ success: false, error: 'Verification token, email, and new password are required', timestamp: new Date().toISOString() });
     }
 
     if (newPassword.length < 6) {
@@ -494,11 +597,11 @@ router.post('/reset-password', async (req, res) => {
     ).catch(() => null);
 
     if (!record) {
-      return res.status(400).json({ success: false, error: 'Invalid or expired reset link', timestamp: new Date().toISOString() });
+      return res.status(400).json({ success: false, error: 'Invalid or expired verification. Please start the password reset process again.', timestamp: new Date().toISOString() });
     }
 
     if (new Date(record.resetPasswordExpires) < new Date()) {
-      return res.status(400).json({ success: false, error: 'Reset link has expired. Please request a new one.', timestamp: new Date().toISOString() });
+      return res.status(400).json({ success: false, error: 'Verification has expired. Please request a new OTP.', timestamp: new Date().toISOString() });
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
