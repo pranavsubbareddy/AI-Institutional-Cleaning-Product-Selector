@@ -478,12 +478,13 @@ router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
 
     await sendPasswordResetOTPEmail(record.email, record.displayName, otp);
 
-    // If it's a seed user without email config, return the OTP in the response for testing
-    if (isSeedUser && !process.env.RESEND_API_KEY) {
+    // If email service is not configured, return the OTP in the response for all users
+    // so the app works in development/demo without a Resend API key
+    if (!process.env.RESEND_API_KEY) {
       return res.json({
         success: true,
         message: 'A password reset OTP has been sent to your email.',
-        data: { otp }, // Only returned for seed users when email is not configured
+        data: { otp },
         timestamp: new Date().toISOString()
       });
     }

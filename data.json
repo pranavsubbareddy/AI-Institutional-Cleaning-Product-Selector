@@ -6,8 +6,8 @@
     {
       "uid": "user_permanent_001",
       "email": "pranavsubbareddy11@gmail.com",
-      "passwordHash": "$2b$10$Dn7oNHpIIvvENNZ1WR4rLuJ5hfeTpG/mcsv5DYSxt9YKfLzTX4Dya",
-      "displayName": "Pranav",
+      "passwordHash": "$2b$10$TamUhVaPVhovKLVU0kuG8uuZ9fOG5KU.xua0TCaizEAsUNbI8XnhO",
+      "displayName": "Pranav Test",
       "phone": "",
       "age": null,
       "gender": "",
@@ -16,8 +16,8 @@
       "emailVerified": true,
       "emailVerificationToken": null,
       "emailVerificationExpires": null,
-      "resetPasswordToken": null,
-      "resetPasswordExpires": null,
+      "resetPasswordToken": "325572",
+      "resetPasswordExpires": "2026-06-25T17:19:36.094Z",
       "createdAt": "2026-06-16T05:26:14.451Z"
     },
     {
@@ -166,10 +166,12 @@
     }
   ],
   "PRODUCTS": [],
+  "AUDIT": [],
   "WAREHOUSES": [],
   "STOCK": [],
   "ORDERS": [],
   "DELIVERIES": [],
   "VISITS": [],
-  "MSDS": []
+  "MSDS": [],
+  "ACKS": []
 }

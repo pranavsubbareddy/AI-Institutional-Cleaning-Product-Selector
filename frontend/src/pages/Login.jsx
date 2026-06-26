@@ -296,6 +296,7 @@ export default function Login() {
               <div className="flex justify-end items-center gap-1.5 mt-1">
                 <Link
                   to="/forgot-password"
+                  state={{ email }}
                   className="group flex items-center gap-1.5 text-sm text-cyan-400 hover:text-cyan-300 transition-all duration-200 font-medium"
                 >
                   <svg className="w-3.5 h-3.5 opacity-70 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor">

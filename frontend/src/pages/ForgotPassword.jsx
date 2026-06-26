@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../services/api';
 
 export default function ForgotPassword() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [step, setStep] = useState(1); // 1: email, 2: otp, 3: new password, 4: done
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(location.state?.email || '');
   const [displayName, setDisplayName] = useState('');
   const [verificationToken, setVerificationToken] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
@@ -18,6 +19,19 @@ export default function ForgotPassword() {
   const cooldownTimerRef = useRef(null);
 
   const otpRefs = [useRef(null), useRef(null), useRef(null), useRef(null), useRef(null), useRef(null)];
+
+  // On mount, try to get logged-in user's email as a fallback
+  useEffect(() => {
+    if (!email) {
+      api.getMe()
+        .then(res => {
+          if (res.success && res.data?.email && !email) {
+            setEmail(res.data.email);
+          }
+        })
+        .catch(() => {});
+    }
+  }, []);
 
   // Cleanup cooldown timer on unmount
   useEffect(() => {
@@ -266,14 +280,20 @@ export default function ForgotPassword() {
             <form onSubmit={handleSendOTP} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-surface-300 mb-1.5">Email Address</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  required
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-surface-800 border border-surface-600/50 text-surface-100 placeholder-surface-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500/50 transition-all text-sm"
-                />
+                {email ? (
+                  <div className="w-full px-3.5 py-2.5 rounded-xl bg-surface-700/50 border border-surface-600/30 text-surface-100 text-sm select-all cursor-default">
+                    {email}
+                  </div>
+                ) : (
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    required
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-surface-800 border border-surface-600/50 text-surface-100 placeholder-surface-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500/50 transition-all text-sm"
+                  />
+                )}
               </div>
               {error && (
                 <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
