@@ -10,6 +10,7 @@ export default function ForgotPassword() {
   const [displayName, setDisplayName] = useState('');
   const [verificationToken, setVerificationToken] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [otpToken, setOtpToken] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -70,11 +71,9 @@ export default function ForgotPassword() {
     try {
       const res = await api.forgotPassword(email);
       if (res.success) {
-        // Seed users get the OTP in response when email is not configured
-        if (res.data?.otp) {
-          // Auto-fill OTP for seed users in dev mode
-          const digits = res.data.otp.split('');
-          setOtp(digits);
+        // Store the OTP token for JWT-based verification (no auto-fill)
+        if (res.data?.otpToken) {
+          setOtpToken(res.data.otpToken);
         }
         setStep(2);
         startCooldown();
@@ -98,9 +97,8 @@ export default function ForgotPassword() {
     try {
       const res = await api.forgotPassword(email);
       if (res.success) {
-        if (res.data?.otp) {
-          const digits = res.data.otp.split('');
-          setOtp(digits);
+        if (res.data?.otpToken) {
+          setOtpToken(res.data.otpToken);
         }
         startCooldown();
         // Focus first OTP input
@@ -157,7 +155,7 @@ export default function ForgotPassword() {
     setSubmitting(true);
 
     try {
-      const res = await api.verifyResetOTP(email, otpString);
+      const res = await api.verifyResetOTP(email, otpString, otpToken || undefined);
       if (res.success && res.data) {
         setDisplayName(res.data.displayName);
         setVerificationToken(res.data.verificationToken);

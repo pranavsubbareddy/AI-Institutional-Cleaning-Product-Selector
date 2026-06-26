@@ -7,35 +7,29 @@ const ROLE_PRIMARY_LINKS = {
   admin: [
     { path: '/form', label: 'Form' },
     { path: '/admin', label: 'Dashboard' },
-    { path: '/warehouse', label: 'Warehouse' },
-    { path: '/deliveries', label: 'Deliveries' },
-    { path: '/orders', label: 'Orders' },
   ],
   sales_admin: [
     { path: '/form', label: 'Form' },
     { path: '/admin-portal', label: 'Dashboard' },
-    { path: '/orders', label: 'Orders' },
-    { path: '/salesman', label: 'Sales' },
   ],
   salesman: [
     { path: '/form', label: 'Form' },
-    { path: '/salesman', label: 'Visits' },
     { path: '/dashboard', label: 'Dashboard' },
   ],
   warehouse_staff: [
-    { path: '/warehouse', label: 'Warehouse' },
-    { path: '/deliveries', label: 'Deliveries' },
+    { path: '/form', label: 'Form' },
+    { path: '/dashboard', label: 'Dashboard' },
   ],
   delivery_coordinator: [
-    { path: '/deliveries', label: 'Deliveries' },
-    { path: '/warehouse', label: 'Stock' },
+    { path: '/form', label: 'Form' },
+    { path: '/dashboard', label: 'Dashboard' },
   ],
   accounts_manager: [
-    { path: '/orders', label: 'Orders' },
-    { path: '/admin', label: 'Analytics' },
+    { path: '/form', label: 'Form' },
+    { path: '/dashboard', label: 'Dashboard' },
   ],
   compliance_admin: [
-    { path: '/compliance', label: 'Compliance' },
+    { path: '/form', label: 'Form' },
     { path: '/dashboard', label: 'Dashboard' },
   ],
   field_staff: [

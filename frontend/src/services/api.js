@@ -94,7 +94,7 @@ export const api = {
   resendVerification: () => fetchApi('/auth/resend-verification', { method: 'POST' }),
   verifyEmail: (token, email) => fetchApi('/auth/verify-email', { method: 'POST', body: JSON.stringify({ token, email }) }),
   forgotPassword: (email) => fetchApi('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
-  verifyResetOTP: (email, otp) => fetchApi('/auth/verify-reset-otp', { method: 'POST', body: JSON.stringify({ email, otp }) }),
+  verifyResetOTP: (email, otp, otpToken) => fetchApi('/auth/verify-reset-otp', { method: 'POST', body: JSON.stringify({ email, otp, otpToken }) }),
   validateResetToken: (token) => fetchApi(`/auth/validate-reset-token?token=${encodeURIComponent(token)}`),
   resetPassword: (token, email, newPassword) => fetchApi('/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, email, newPassword }) }),
   updateProfile: (data) => fetchApi('/auth/profile', { method: 'PUT', body: JSON.stringify(data) }),
