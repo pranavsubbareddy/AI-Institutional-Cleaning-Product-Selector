@@ -334,19 +334,30 @@ export default function Recommendations() {
   </div>
 </body></html>`;
 
-      const container = document.createElement('div');
-      container.innerHTML = html;
-      // Position on-screen but invisible so html2canvas can render it properly
-      // (off-screen elements with left: -9999px sometimes render as blank)
-      container.style.position = 'fixed';
-      container.style.top = '0';
-      container.style.left = '0';
-      container.style.width = '794px';
-      container.style.height = '1123px';
-      container.style.zIndex = '-9999';
-      container.style.opacity = '0.01';
-      container.style.pointerEvents = 'none';
-      document.body.appendChild(container);
+      // Use an iframe for reliable PDF rendering.
+      // html2canvas struggles with hidden or off-screen elements in the main document,
+      // but an iframe provides a clean, isolated rendering context that works consistently.
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.top = '0';
+      iframe.style.left = '0';
+      iframe.style.width = '794px';
+      iframe.style.height = '1123px';
+      iframe.style.border = 'none';
+      iframe.style.zIndex = '-9999';
+      iframe.style.pointerEvents = 'none';
+      iframe.style.background = '#ffffff';
+      iframe.title = 'pdf-export';
+      document.body.appendChild(iframe);
+
+      // Write the HTML into the iframe
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+      iframeDoc.open();
+      iframeDoc.write(html);
+      iframeDoc.close();
+
+      // Wait for iframe content to fully render (images, fonts, etc.)
+      await new Promise(resolve => setTimeout(resolve, 300));
 
       const fileName = `quotation-${instName.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}.pdf`;
       const opt = {
@@ -369,8 +380,9 @@ export default function Recommendations() {
         pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
       };
 
-      await html2pdf().set(opt).from(container).save();
-      document.body.removeChild(container);
+      // Render from the iframe's body (clean document context)
+      await html2pdf().set(opt).from(iframe.contentDocument.body).save();
+      document.body.removeChild(iframe);
       setToast({ type: 'success', message: 'PDF downloaded successfully!' });
       setTimeout(() => setToast(null), 5000);
     } catch (err) {

@@ -128,31 +128,115 @@ export async function sendFormWithReportEmail(formData, recommendationData) {
 
   const allInfoRows = contactInfoHtml.join('') + facilityInfoHtml.join('') + optionalFieldsHtml.join('');
 
+  // Build human-readable labels for enum values
+  const hoursMap = { day: 'Day (6AM-6PM)', night: 'Night (6PM-6AM)', '24x7': '24x7 Operation', business: 'Business Hours (9-5)' };
+  const operatingHoursLabel = hoursMap[formData.operating_hours] || formData.operating_hours || 'N/A';
+
+  const ageMap = { new: 'New (0-5 yrs)', moderate: 'Moderate (5-15 yrs)', old: 'Old (15-30 yrs)', vintage: 'Vintage (30+ yrs)' };
+  const facilityAgeLabel = ageMap[formData.facility_age] || formData.facility_age || 'N/A';
+
+  const hygieneLabel = (formData.hygiene_standard || '').replace('_', ' ') || 'N/A';
+  const surfaceTypesLabel = (formData.surface_types || []).map(s => surfaceLabels[s] || s).join(', ') || 'N/A';
+  const equipmentLabel = (formData.equipment || []).map(e => equipmentLabels[e] || e).join(', ') || 'None';
+  const preferencesLabel = (formData.preferences || []).length > 0 ? formData.preferences.map(p => preferenceLabels[p] || p).join(', ') : 'None';
+  const areaSizeLabel = formData.area_size ? Number(formData.area_size).toLocaleString() : 'N/A';
+
+  // Build a complete HTML email body that can be used as a single {{full_email_html}} variable
+  const fullEmailHtml = `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#334155;">
+      <div style="background:#0f766e;color:white;padding:20px;border-radius:8px 8px 0 0;">
+        <h1 style="margin:0;font-size:20px;">Ganga Maxx - Cleaning Product Recommendations</h1>
+        <p style="margin:6px 0 0;opacity:0.85;font-size:13px;">AI Institutional Cleaning Product Selector</p>
+      </div>
+
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-top:0;padding:20px;border-radius:0 0 8px 8px;">
+        <h2 style="font-size:14px;color:#0f172a;margin:0 0 12px;padding-bottom:8px;border-bottom:2px solid #0d9488;">Contact Information</h2>
+        <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+          <tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Name</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;">${formData.contact_name || 'N/A'}</td></tr>
+          <tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Email</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;">${formData.contact_email || 'N/A'}</td></tr>
+          <tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Phone</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;">${formData.contact_phone || 'N/A'}</td></tr>
+          <tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Facility</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;">${formData.name || 'N/A'}</td></tr>
+          <tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Address</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;">${formData.address || 'N/A'}</td></tr>
+        </table>
+
+        <h2 style="font-size:14px;color:#0f172a;margin:16px 0 12px;padding-bottom:8px;border-bottom:2px solid #0d9488;">Facility Profile</h2>
+        <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+          <tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Type</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;text-transform:capitalize;">${formData.institution_type || 'N/A'}</td></tr>
+          <tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Area</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;">${areaSizeLabel} sq. ft.</td></tr>
+          <tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Floors</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;">${formData.floors || 'N/A'}</td></tr>
+          <tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Occupants</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;">${formData.occupants || 'N/A'}${formData.occupants ? '+' : ''}</td></tr>
+          <tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Operating Hours</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;">${operatingHoursLabel}</td></tr>
+          <tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Surface Types</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;">${surfaceTypesLabel}</td></tr>
+          <tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Hygiene Standard</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;text-transform:capitalize;">${hygieneLabel}</td></tr>
+          <tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Budget</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;text-transform:capitalize;">${formData.budget || 'N/A'}</td></tr>
+          <tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Cleaning Frequency</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;">${frequencyLabels[formData.cleaning_frequency] || formData.cleaning_frequency || 'N/A'}</td></tr>
+          <tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Facility Age</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;">${facilityAgeLabel}</td></tr>
+          <tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Equipment</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;">${equipmentLabel}</td></tr>
+          <tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Product Preferences</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;">${preferencesLabel}</td></tr>
+          ${formData.current_products ? `<tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Current Products</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;">${formData.current_products}</td></tr>` : ''}
+          ${formData.special_requirements ? `<tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Special Requirements</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;">${formData.special_requirements}</td></tr>` : ''}
+          ${formData.facility_description ? `<tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Description</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;">${formData.facility_description}</td></tr>` : ''}
+        </table>
+
+        ${items.length > 0 ? `
+        <h2 style="font-size:14px;color:#0f172a;margin:16px 0 12px;padding-bottom:8px;border-bottom:2px solid #0d9488;">Recommended Products</h2>
+        ${buildProductTable(productRows, totalCost)}
+        <p style="font-size:12px;color:#64748b;margin-top:12px;">${items.length} product(s) recommended with a total estimated monthly cost of Rs ${Number(totalCost).toLocaleString('en-IN')}</p>
+        ` : ''}
+
+        ${alerts.length > 0 ? `
+        <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:12px;margin-top:16px;">
+          <p style="font-size:13px;font-weight:600;color:#b91c1c;margin:0 0 6px;">Alerts & Notes</p>
+          <ul style="margin:0;padding-left:18px;font-size:12px;color:#991b1b;">${alerts.map(a => '<li>' + a + '</li>').join('')}</ul>
+        </div>
+        ` : ''}
+
+        <div style="text-align:center;padding-top:20px;margin-top:20px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;">
+          <p style="margin:0;">Generated by <strong>Ganga Maxx</strong> — AI Institutional Cleaning Product Selector</p>
+          <p style="margin:4px 0 0;">${new Date().toLocaleString('en-IN')}</p>
+        </div>
+      </div>
+    </div>
+  `;
+
   const templateParams = {
+    // ── Recipient ──
     to_email: formData.contact_email,
+    // ── Common / generic names (for template compatibility) ──
+    name: formData.contact_name || 'N/A',
+    email: formData.contact_email || 'N/A',
+    phone: formData.contact_phone || 'N/A',
+    facility: formData.name || 'N/A',
+    address: formData.address || 'N/A',
+    type: formData.institution_type || 'N/A',
+    area: areaSizeLabel,
+    message: recommendationData?.summary || 'Recommendation generated successfully.',
+    // ── Original specific names (backward compat) ──
     contact_name: formData.contact_name || 'N/A',
     contact_phone: formData.contact_phone || 'N/A',
     contact_email: formData.contact_email || 'N/A',
     facility_address: formData.address || 'N/A',
     facility_name: formData.name,
     institution_type: formData.institution_type || 'N/A',
-    area_size: String(Number(formData.area_size || 0).toLocaleString()),
+    area_size: areaSizeLabel,
     floors: String(formData.floors || 1),
     occupants: String(formData.occupants || 'N/A'),
-    operating_hours: formData.operating_hours || 'N/A',
+    operating_hours: operatingHoursLabel,
     facility_description: formData.facility_description || '',
-    surface_types: (formData.surface_types || []).map(s => surfaceLabels[s] || s).join(', ') || 'N/A',
-    hygiene_standard: (formData.hygiene_standard || '').replace('_', ' ') || 'N/A',
+    surface_types: surfaceTypesLabel,
+    hygiene_standard: hygieneLabel,
     budget: formData.budget || 'N/A',
     cleaning_frequency: frequencyLabels[formData.cleaning_frequency] || formData.cleaning_frequency || 'N/A',
-    facility_age: formData.facility_age || 'N/A',
-    equipment: (formData.equipment || []).map(e => equipmentLabels[e] || e).join(', ') || '',
-    preferences: (formData.preferences || []).length > 0 ? formData.preferences.map(p => preferenceLabels[p] || p).join(', ') : '',
+    facility_age: facilityAgeLabel,
+    equipment: equipmentLabel,
+    preferences: preferencesLabel,
     special_requirements: formData.special_requirements || '',
     current_products: formData.current_products || '',
+    // ── Recommendation data ──
     recommendation_summary: recommendationData?.summary || 'Recommendation generated successfully.',
     total_cost: 'Rs ' + Number(totalCost).toLocaleString('en-IN') + '/month',
     item_count: String(items.length),
+    // ── HTML blocks ──
     alerts_text: alerts.length > 0 ? alerts.join('\n• ') : 'None',
     alerts_html: alerts.length > 0 ? alerts.map(a => '<li>' + a + '</li>').join('') : '<li>No alerts</li>',
     product_details_html: items.length > 0 ? buildProductTable(productRows, totalCost) : '<p>No product recommendations.</p>',
@@ -160,6 +244,8 @@ export async function sendFormWithReportEmail(formData, recommendationData) {
     facility_info_html: '<table style="width:100%;border-collapse:collapse;margin-bottom:8px;">' + facilityInfoHtml.join('') + '</table>',
     optional_fields_html: optionalFieldsHtml.length > 0 ? '<table style="width:100%;border-collapse:collapse;margin-top:8px;">' + optionalFieldsHtml.join('') + '</table>' : '',
     all_info_html: '<table style="width:100%;border-collapse:collapse;">' + allInfoRows + '</table>',
+    // ── COMPLETE HTML EMAIL BODY (use {{full_email_html}} in your template) ──
+    full_email_html: fullEmailHtml,
   };
 
   try {
