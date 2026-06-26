@@ -121,9 +121,9 @@ export default function RequirementForm() {
         surface_types: formData.surface_types,
         hygiene_standard: formData.hygiene_standard,
         budget: formData.budget,
-        contact_name: user?.displayName || formData.contact_name || null,
-        contact_email: user?.email || formData.contact_email || null,
-        contact_phone: user?.phone || formData.contact_phone || null,
+        contact_name: formData.contact_name || user?.displayName || null,
+        contact_email: formData.contact_email || user?.email || null,
+        contact_phone: formData.contact_phone || user?.phone || null,
         address: formData.address || null,
         metadata: {
           floors: formData.floors,
@@ -325,32 +325,20 @@ export default function RequirementForm() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="label">Contact Person</label>
-                <div className="input-field bg-surface-700/50 text-surface-300 flex items-center">
-                  <svg className="w-4 h-4 mr-2 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                  {user?.displayName || 'N/A'}
-                </div>
+                <input type="text" name="contact_name" value={formData.contact_name} onChange={handleChange}
+                  className="input-field" placeholder="e.g., John Doe" />
               </div>
               <div>
                 <label className="label">Contact Email</label>
-                <div className="input-field bg-surface-700/50 text-surface-300 flex items-center">
-                  <svg className="w-4 h-4 mr-2 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                  {user?.email || 'N/A'}
-                </div>
+                <input type="email" name="contact_email" value={formData.contact_email} onChange={handleChange}
+                  className="input-field" placeholder="e.g., john@example.com" />
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="label">Contact Phone</label>
-                <div className="input-field bg-surface-700/50 text-surface-300 flex items-center">
-                  <svg className="w-4 h-4 mr-2 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                  </svg>
-                  {user?.phone || 'N/A'}
-                </div>
+                <input type="tel" name="contact_phone" value={formData.contact_phone} onChange={handleChange}
+                  className="input-field" placeholder="e.g., +91 98765 43210" />
               </div>
               <div>
                 <label className="label">Address / Location</label>

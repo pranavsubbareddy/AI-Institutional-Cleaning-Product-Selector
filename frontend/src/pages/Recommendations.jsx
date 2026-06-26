@@ -336,10 +336,16 @@ export default function Recommendations() {
 
       const container = document.createElement('div');
       container.innerHTML = html;
-      container.style.position = 'absolute';
-      container.style.left = '-9999px';
+      // Position on-screen but invisible so html2canvas can render it properly
+      // (off-screen elements with left: -9999px sometimes render as blank)
+      container.style.position = 'fixed';
       container.style.top = '0';
+      container.style.left = '0';
       container.style.width = '794px';
+      container.style.height = '1123px';
+      container.style.zIndex = '-9999';
+      container.style.opacity = '0.01';
+      container.style.pointerEvents = 'none';
       document.body.appendChild(container);
 
       const fileName = `quotation-${instName.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}.pdf`;
@@ -354,7 +360,10 @@ export default function Recommendations() {
           letterRendering: true,
           backgroundColor: '#ffffff',
           width: 794,
-          logging: false
+          height: 1123,
+          logging: false,
+          windowWidth: 794,
+          windowHeight: 1123
         },
         jsPDF: { unit: 'px', format: [794, 1123], orientation: 'portrait' },
         pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
