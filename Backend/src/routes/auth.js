@@ -68,7 +68,7 @@ router.post('/signup', async (req, res, next) => {
       await run(
         'UPDATE users SET passwordHash = ?, displayName = ?, phone = ?, age = ?, gender = ? WHERE email = ?',
         [hashedPassword, displayNameTrimmed, phone || '', age ? Number(age) : null, gender || '', normalizedEmail]
-      ).catch(() => {});
+      ).catch(err => console.error('[Auth] Signup-reclaim UPDATE failed:', err.message));
 
       // Generate token for the existing user (their uid stays the same, so institutions stay linked)
       const user = stripPassword(existing);
@@ -474,7 +474,7 @@ router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
     await run(
       'UPDATE users SET resetPasswordToken = ?, resetPasswordExpires = ? WHERE email = ?',
       [otp, resetExpires, normalizedEmail]
-    ).catch(() => {});
+    ).catch(err => console.error('[Auth] Forgot-password UPDATE failed:', err.message));
 
     await sendPasswordResetOTPEmail(record.email, record.displayName, otp);
 
@@ -571,7 +571,7 @@ router.post('/verify-reset-otp', verifyOTPLimiter, async (req, res) => {
     await run(
       'UPDATE users SET resetPasswordToken = ?, resetPasswordExpires = ? WHERE email = ?',
       [resetToken, new Date(Date.now() + 10 * 60 * 1000).toISOString(), normalizedEmail]
-    ).catch(() => {});
+    ).catch(err => console.error('[Auth] Verify-reset-otp UPDATE failed:', err.message));
 
     res.json({
       success: true,
@@ -681,10 +681,22 @@ router.post('/reset-password', async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    await run(
+    const updateResult = await run(
       'UPDATE users SET passwordHash = ?, resetPasswordToken = NULL, resetPasswordExpires = NULL WHERE email = ?',
       [hashedPassword, normalizedEmail]
-    ).catch(() => {});
+    );
+
+    // Verify the update actually affected a row — if the user record is
+    // missing or the write failed silently, return an error instead of a
+    // misleading success message.
+    if (!updateResult || updateResult.affectedRows === 0) {
+      console.error('[Auth] Password reset UPDATE returned 0 affected rows for', normalizedEmail);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to update password. The account may have been deleted or a write error occurred. Please try again.',
+        timestamp: new Date().toISOString()
+      });
+    }
 
     res.json({
       success: true,

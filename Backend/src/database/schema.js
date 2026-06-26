@@ -537,17 +537,29 @@ function memQueryAll(sql, params) {
       const setClause = updMatch[2];
       let whereClause = (updMatch[3] || '').trim();
       whereClause = stripTrailingClauses(whereClause);
-      const setParts = setClause.split(',').map(p => {
-        const m = p.trim().match(/^`?(\w+)`?\s*=\s*\?$/);
-        return m ? m[1] : null;
+      // Parse each SET assignment: captures column = ?, column = NULL,
+      // column = 'literal', column = "literal", and column = NUMBER.
+      const setItems = setClause.split(',').map(p => {
+        const t = p.trim();
+        let m;
+        if ((m = t.match(/^`?(\w+)`?\s*=\s*\?$/))) return { col: m[1], src: 'param' };
+        if ((m = t.match(/^`?(\w+)`?\s*=\s*NULL$/i))) return { col: m[1], src: 'lit', val: null };
+        if ((m = t.match(/^`?(\w+)`?\s*=\s*('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")$/))) return { col: m[1], src: 'lit', val: m[2].replace(/^['"]|['"]$/g, '') };
+        if ((m = t.match(/^`?(\w+)`?\s*=\s*(-?\d+(?:\.\d+)?)$/))) return { col: m[1], src: 'lit', val: Number(m[2]) };
+        return null;
       }).filter(Boolean);
-      const setValues = params.slice(0, setParts.length);
-      const whereParams = params.slice(setParts.length);
+      const paramCount = setItems.filter(i => i.src === 'param').length;
+      const setValues = params.slice(0, paramCount);
+      const whereParams = params.slice(paramCount);
       const table = memTable(tableName);
       let count = 0;
       table.forEach(row => {
         if (memRowMatches(row, whereClause, whereParams)) {
-          setParts.forEach((col, i) => { row[col] = setValues[i]; });
+          let pi = 0;
+          setItems.forEach(item => {
+            if (item.src === 'param') { row[item.col] = setValues[pi++]; }
+            else { row[item.col] = item.val; }
+          });
           count++;
         }
       });
