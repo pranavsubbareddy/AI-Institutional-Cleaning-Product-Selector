@@ -142,8 +142,8 @@ export default function AuditLogPage() {
     const html = '<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Audit Log - Ganga Maxx</title><style>@page{margin:12mm 10mm}body{font-family:Segoe UI,Arial,sans-serif;color:#1a1a2e;font-size:10px;line-height:1.4}h1{font-size:18px;margin:0 0 4px}.sub{color:#6b7280;font-size:10px;margin-bottom:16px}table{width:100%;border-collapse:collapse;font-size:8px}th{background:#f3f4f6;text-align:left;padding:4px 5px;text-transform:uppercase;letter-spacing:.3px;color:#6b7280;border-bottom:1px solid #e5e7eb}td{padding:3px 5px;border-bottom:1px solid #f3f4f6;color:#374151;word-break:break-all}.footer{text-align:center;padding-top:12px;font-size:8px;color:#9ca3af}</style></head><body><h1>Ganga Maxx \u2014 Audit Log</h1><div class=\"sub\">Generated ' + now + ' ' + dot + ' ' + events.length + ' entries</div><table><tr><th>ID</th><th>Rec ID</th><th>Old ' + arrow + ' New</th><th>Changed By</th><th>Role</th><th>Institution</th><th>Time</th></tr>' + rowsHtml + '</table><div class=\"footer\">Ganga Maxx Institutional Cleaning Platform ' + dot + ' AI-Powered</div></body></html>';
     const container = document.createElement('div');
     container.innerHTML = html;
-    container.style.position = 'absolute';
-    container.style.left = '-9999px';
+    // Place on-screen with near-zero opacity — html2canvas cannot capture off-screen elements reliably
+    container.style.cssText = 'position:fixed;top:0;left:0;width:794px;background:#ffffff;z-index:2147483647;opacity:0.01;pointer-events:none;';
     document.body.appendChild(container);
     try {
       const mod = await import('html2pdf.js');
@@ -151,7 +151,7 @@ export default function AuditLogPage() {
         margin: [8, 6, 8, 6],
         filename: 'audit-log-' + new Date().toISOString().slice(0, 10) + '.pdf',
         image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+        html2canvas: { scale: 2, useCORS: true, letterRendering: true, backgroundColor: '#ffffff' },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
         pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
       }).from(container).save();

@@ -222,14 +222,15 @@ export default function OrdersPage() {
       `<div class="footer">Ganga Maxx AI Institutional Cleaning Products &middot; ${inv.invoiceNumber}</div></body></html>`;
     const container = document.createElement('div');
     container.innerHTML = html;
-    container.style.position = 'absolute'; container.style.left = '-9999px';
+    // Place on-screen with near-zero opacity — html2canvas cannot capture off-screen elements reliably
+    container.style.cssText = 'position:fixed;top:0;left:0;width:794px;background:#ffffff;z-index:2147483647;opacity:0.01;pointer-events:none;';
     document.body.appendChild(container);
     try {
       const mod = await import('html2pdf.js');
       await mod.default().set({
         margin: [8, 6, 8, 6], filename: inv.invoiceNumber + '.pdf',
         image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+        html2canvas: { scale: 2, useCORS: true, letterRendering: true, backgroundColor: '#ffffff' },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
       }).from(container).save();

@@ -212,8 +212,8 @@ export default function Recommendations() {
       pdfContainer = document.createElement('div');
       pdfContainer.id = 'pdf-export-container';
       pdfContainer.innerHTML = bodyHtml;
-      // Position off-screen but still in the DOM so html2canvas can capture it
-      pdfContainer.style.cssText = 'position:fixed;top:0;left:0;width:794px;background:#ffffff;z-index:-9999;pointer-events:none;overflow:hidden;';
+      // Position on-screen but nearly invisible — html2canvas cannot capture off-screen or negative-z elements reliably
+      pdfContainer.style.cssText = 'position:fixed;top:0;left:0;width:794px;background:#ffffff;z-index:2147483647;opacity:0.01;pointer-events:none;';
       document.body.appendChild(pdfContainer);
 
       // Small delay to let the browser parse and apply the injected styles

@@ -302,9 +302,8 @@ export default function AdminDashboard() {
 
       const container = document.createElement('div');
       container.innerHTML = reportHTML;
-      container.style.position = 'absolute';
-      container.style.left = '-9999px';
-      container.style.top = '0';
+      // Place on-screen with near-zero opacity — html2canvas cannot capture off-screen elements reliably
+      container.style.cssText = 'position:fixed;top:0;left:0;width:794px;background:#ffffff;z-index:2147483647;opacity:0.01;pointer-events:none;';
       document.body.appendChild(container);
 
       const { default: html2pdf } = await import('html2pdf.js');
