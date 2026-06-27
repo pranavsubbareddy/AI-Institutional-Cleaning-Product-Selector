@@ -280,6 +280,47 @@ export async function sendReportToEmail(recipientEmail, recipientName, reportDat
   const alerts = reportData?.alerts || [];
   const instName = reportData?.institution_name || 'Your Facility';
 
+  // ── Label maps ──
+  const surfaceLabels = {
+    hard_floor: 'Hard Floor', carpet: 'Carpet', glass: 'Glass / Windows',
+    tile: 'Tile', stainless_steel: 'Stainless Steel', wood: 'Wood',
+    marble: 'Marble', countertop: 'Countertop', porcelain: 'Porcelain', mirror: 'Mirror'
+  };
+  const preferenceLabels = {
+    eco_friendly: 'Eco-Friendly', fragrance_free: 'Fragrance-Free',
+    hypoallergenic: 'Hypoallergenic', concentrated: 'Concentrated',
+    ready_to_use: 'Ready-to-Use', industrial_grade: 'Industrial Grade'
+  };
+  const equipmentLabels = {
+    mop: 'Mop & Bucket', vacuum: 'Vacuum Cleaner', scrubber: 'Floor Scrubber',
+    pressure_washer: 'Pressure Washer', steam_cleaner: 'Steam Cleaner',
+    carpet_extractor: 'Carpet Extractor', microfiber: 'Microfiber Cloths',
+    auto_dispenser: 'Auto Dispenser'
+  };
+  const frequencyLabels = {
+    daily: 'Daily', twice_daily: 'Twice Daily', weekly: 'Weekly',
+    multiple_weekly: 'Multiple/Week', custom: 'As Needed'
+  };
+  const hoursMap = { day: 'Day (6AM-6PM)', night: 'Night (6PM-6AM)', '24x7': '24x7 Operation', business: 'Business Hours (9-5)' };
+  const ageMap = { new: 'New (0-5 yrs)', moderate: 'Moderate (5-15 yrs)', old: 'Old (15-30 yrs)', vintage: 'Vintage (30+ yrs)' };
+
+  // ── Extract values from reportData (including nested metadata) ──
+  const metadata = reportData?.metadata || {};
+  const surfaceTypesArr = Array.isArray(reportData?.surface_types)
+    ? reportData.surface_types
+    : (typeof reportData?.surface_types === 'string' ? JSON.parse(reportData.surface_types) : []);
+  const surfaceTypesLabel = surfaceTypesArr.map(s => surfaceLabels[s] || s).join(', ') || 'N/A';
+  const hygieneLabel = (reportData?.hygiene_standard || '').replace(/_/g, ' ') || 'N/A';
+  const frequencyLabel = frequencyLabels[metadata.cleaning_frequency] || metadata.cleaning_frequency || 'N/A';
+  const equipmentArr = metadata.equipment || [];
+  const equipmentLabel = equipmentArr.map(e => equipmentLabels[e] || e).join(', ') || 'None';
+  const preferencesArr = metadata.preferences || [];
+  const preferencesLabel = preferencesArr.map(p => preferenceLabels[p] || p).join(', ') || 'None';
+  const areaSizeLabel = reportData?.area_size ? Number(reportData.area_size).toLocaleString() : 'N/A';
+  const budgetLabel = reportData?.budget || reportData?.budget_level || 'N/A';
+  const operatingHoursLabel = hoursMap[metadata.operating_hours] || metadata.operating_hours || 'N/A';
+  const facilityAgeLabel = ageMap[metadata.facility_age] || metadata.facility_age || 'N/A';
+
   // Build a complete self-contained HTML email body — use {{{full_email_html}}} in your EmailJS template
   // (triple braces prevent HTML escaping). This is the most reliable way to render formatted HTML.
   const fullEmailHtml = `
@@ -294,6 +335,7 @@ export async function sendReportToEmail(recipientEmail, recipientName, reportDat
         <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
           <tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Name</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;">${recipientName || 'N/A'}</td></tr>
           <tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Email</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;">${recipientEmail}</td></tr>
+          <tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Phone</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;">${reportData?.contact_phone || 'N/A'}</td></tr>
           <tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Facility</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;">${instName}</td></tr>
           <tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Address</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;">${reportData?.address || 'N/A'}</td></tr>
         </table>
@@ -301,10 +343,15 @@ export async function sendReportToEmail(recipientEmail, recipientName, reportDat
         <h2 style="font-size:14px;color:#0f172a;margin:16px 0 12px;padding-bottom:8px;border-bottom:2px solid #0d9488;">Facility Profile</h2>
         <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
           <tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Type</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;text-transform:capitalize;">${reportData?.institution_type || 'N/A'}</td></tr>
-          <tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Area</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;">${reportData?.area_size ? Number(reportData.area_size).toLocaleString() : 'N/A'} sq. ft.</td></tr>
-          <tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Budget</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;text-transform:capitalize;">${reportData?.budget_level || reportData?.budget || 'N/A'}</td></tr>
-          <tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Hygiene Level</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;text-transform:capitalize;">${reportData?.hygiene_level || reportData?.hygiene_standard || 'N/A'}</td></tr>
-        </table>
+          <tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Area</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;">${areaSizeLabel} sq. ft.</td></tr>
+          <tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Surfaces</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;">${surfaceTypesLabel}</td></tr>
+          <tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Hygiene Level</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;text-transform:capitalize;">${hygieneLabel}</td></tr>
+          <tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Budget</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;text-transform:capitalize;">${budgetLabel}</td></tr>
+          <tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Cleaning Frequency</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;">${frequencyLabel}</td></tr>
+          <tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Equipment</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;">${equipmentLabel}</td></tr>
+          ${metadata.floors ? `<tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Floors</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;">${metadata.floors}</td></tr>` : ''}
+          ${metadata.occupants ? `<tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Occupants</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;">${metadata.occupants}+</td></tr>` : ''}
+          <tr><td style="padding:5px 8px;color:#64748b;font-size:13px;">Product Preferences</td><td style="padding:5px 8px;color:#1e293b;font-size:13px;font-weight:500;">${preferencesLabel}</td></tr>
 
         ${items.length > 0 ? `
         <h2 style="font-size:14px;color:#0f172a;margin:16px 0 12px;padding-bottom:8px;border-bottom:2px solid #0d9488;">Recommendations</h2>
@@ -330,13 +377,43 @@ export async function sendReportToEmail(recipientEmail, recipientName, reportDat
   `;
 
   const templateParams = {
+    // ── Recipient ──
     to_email: recipientEmail,
+    // ── Common / generic names (for template compatibility) ──
+    name: recipientName || 'Valued Customer',
+    email: recipientEmail,
+    phone: reportData?.contact_phone || 'N/A',
+    facility: instName,
+    address: reportData?.address || 'N/A',
+    type: reportData?.institution_type || 'N/A',
+    area: areaSizeLabel,
+    message: reportData?.summary || 'Recommendation generated successfully.',
+    // ── Original specific names (backward compat) ──
     contact_name: recipientName || 'Valued Customer',
+    contact_phone: reportData?.contact_phone || 'N/A',
+    contact_email: recipientEmail,
+    facility_address: reportData?.address || 'N/A',
     facility_name: instName,
-    institution_type: reportData?.institution_type || '',
+    institution_type: reportData?.institution_type || 'N/A',
+    area_size: areaSizeLabel,
+    floors: String(metadata.floors || 1),
+    occupants: String(metadata.occupants || 'N/A'),
+    operating_hours: operatingHoursLabel,
+    facility_description: metadata.facility_description || '',
+    surface_types: surfaceTypesLabel,
+    hygiene_standard: hygieneLabel,
+    budget: budgetLabel,
+    cleaning_frequency: frequencyLabel,
+    facility_age: facilityAgeLabel,
+    equipment: equipmentLabel,
+    preferences: preferencesLabel,
+    special_requirements: metadata.special_requirements || '',
+    current_products: metadata.current_products || '',
+    // ── Recommendation data ──
     recommendation_summary: reportData?.summary || 'Your personalized cleaning product recommendations.',
     total_cost: 'Rs ' + Number(totalCost).toLocaleString('en-IN') + '/month',
     item_count: String(items.length),
+    // ── HTML blocks ──
     alerts_text: alerts.length > 0 ? alerts.join('\n• ') : 'None',
     alerts_html: alerts.length > 0 ? alerts.map(a => '<li>' + a + '</li>').join('') : '<li>No alerts</li>',
     product_details_html: items.length > 0 ? buildProductTable(productRows, totalCost) : '<p>No product recommendations.</p>',

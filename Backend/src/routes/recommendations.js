@@ -569,6 +569,8 @@ router.get('/:id', async (req, res, next) => {
       recommendation.metadata = safeJsonParse(institution.metadata, null);
       recommendation.contact_email = institution.contact_email;
       recommendation.contact_name = institution.contact_name;
+      recommendation.contact_phone = institution.contact_phone || null;
+      recommendation.address = institution.address || null;
     }
 
     // Step 3: Fetch recommendation items (with product data via separate queries if needed)

@@ -53,7 +53,6 @@ export default function Recommendations() {
     if (!contentRef.current || downloading) return;
     setDownloading(true);
     let pdfContainer = null;
-    let pdfStyles = null;
     try {
       const escapeHtml = (str) => String(str).replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
       const instName = data.institution_name || 'Recommendation';
@@ -82,128 +81,149 @@ export default function Recommendations() {
       const safeFinancialAlert = data.financialStatusAlert ? escapeHtml(data.financialStatusAlert) : null;
       const safeInstType = escapeHtml((data.institution_type || '').replace(/_/g, ' '));
 
-      // ── Inject CSS into the main document ──────────────────────────────
-      const cssText = `
-        * { box-sizing: border-box; }
-        body { font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; background: #ffffff; color: #334155; margin: 0; padding: 0; font-size: 12px; line-height: 1.5; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        @page { margin: 0; }
-        .pdf-page { max-width: 190mm; margin: 0 auto; padding: 20px 24px; position: relative; }
-        .pdf-header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 14px; margin-bottom: 18px; border-bottom: 3px solid #0d9488; position: relative; }
-        .pdf-header::after { content: ''; position: absolute; bottom: -3px; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, #0d9488, #14b8a6, #0d9488); }
-        .pdf-brand h1 { font-size: 22px; font-weight: 800; color: #0f766e; margin: 0 0 1px 0; letter-spacing: -0.5px; }
-        .pdf-brand .tagline { font-size: 9px; color: #64748b; letter-spacing: 0.3px; }
-        .pdf-doc-info { text-align: right; }
-        .pdf-doc-info h2 { font-size: 17px; font-weight: 700; color: #0f172a; margin: 0 0 3px 0; }
-        .pdf-doc-info .meta { font-size: 9px; color: #64748b; margin-top: 1px; }
-        .pdf-summary-grid { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
-        .pdf-summary-box { background: #f0fdfa; border: 1px solid #ccfbf1; border-radius: 6px; padding: 10px 14px; flex: 1; min-width: 100px; }
-        .pdf-summary-box .lbl { font-size: 8px; text-transform: uppercase; color: #64748b; font-weight: 600; letter-spacing: 0.7px; margin-bottom: 3px; }
-        .pdf-summary-box .val { font-size: 14px; font-weight: 700; color: #0f172a; }
-        .pdf-summary-box .val.accent { color: #059669; }
-        .pdf-table { width: 100%; border-collapse: collapse; margin: 16px 0; border-radius: 6px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
-        .pdf-table thead th { background: #0f766e; color: #ffffff; padding: 10px 7px; font-size: 9px; text-transform: uppercase; letter-spacing: 0.7px; font-weight: 600; text-align: left; }
-        .pdf-table thead th.right { text-align: right; }
-        .pdf-table thead th.center { text-align: center; }
-        .pdf-table tbody td { padding: 8px 7px; border-bottom: 1px solid #e2e8f0; font-size: 10px; color: #475569; }
-        .pdf-table .total-row td { padding: 12px 7px; border-top: 2px solid #0f766e; font-size: 12px; color: #0f172a; font-weight: 700; background: #f0fdfa; }
-        .pdf-table .total-row td.accent { color: #059669; font-size: 14px; text-align: right; }
-        .pdf-section { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px 16px; margin-top: 12px; }
-        .pdf-section .stitle { font-size: 9px; text-transform: uppercase; color: #64748b; font-weight: 600; letter-spacing: 0.7px; margin-bottom: 5px; }
-        .pdf-section .stext { color: #0f172a; font-size: 11px; line-height: 1.6; }
-        .pdf-footer { text-align: center; padding-top: 16px; margin-top: 20px; border-top: 1px solid #e2e8f0; font-size: 8px; color: #94a3b8; line-height: 1.6; }
-        .pdf-watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg); font-size: 70px; color: rgba(13, 148, 136, 0.035); font-weight: 900; pointer-events: none; z-index: 0; letter-spacing: 8px; overflow: hidden; }
-        .pdf-safety-badge { display: inline-block; padding: 1px 6px; border-radius: 2px; font-size: 8px; font-weight: 600; background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; margin: 1px 2px 1px 0; }
-        .pdf-terms { margin-top: 16px; padding: 10px 14px; background: #f8fafc; border-left: 3px solid #0d9488; border-radius: 0 6px 6px 0; font-size: 8px; color: #94a3b8; line-height: 1.7; }
+      // ── Label maps for facility profile fields ──
+      const surfaceLabelsPdf = {
+        hard_floor: 'Hard Floor', carpet: 'Carpet', glass: 'Glass / Windows',
+        tile: 'Tile', stainless_steel: 'Stainless Steel', wood: 'Wood',
+        marble: 'Marble', countertop: 'Countertop', porcelain: 'Porcelain', mirror: 'Mirror'
+      };
+      const prefLabelsPdf = {
+        eco_friendly: 'Eco-Friendly', fragrance_free: 'Fragrance-Free',
+        hypoallergenic: 'Hypoallergenic', concentrated: 'Concentrated',
+        ready_to_use: 'Ready-to-Use', industrial_grade: 'Industrial Grade'
+      };
+      const equipLabelsPdf = {
+        mop: 'Mop & Bucket', vacuum: 'Vacuum Cleaner', scrubber: 'Floor Scrubber',
+        pressure_washer: 'Pressure Washer', steam_cleaner: 'Steam Cleaner',
+        carpet_extractor: 'Carpet Extractor', microfiber: 'Microfiber Cloths',
+        auto_dispenser: 'Auto Dispenser'
+      };
+      const freqLabelsPdf = {
+        daily: 'Daily', twice_daily: 'Twice Daily', weekly: 'Weekly',
+        multiple_weekly: 'Multiple/Week', custom: 'As Needed'
+      };
+      const hoursMapPdf = { day: 'Day (6AM-6PM)', night: 'Night (6PM-6AM)', '24x7': '24x7 Operation', business: 'Business Hours (9-5)' };
+      const ageMapPdf = { new: 'New (0-5 yrs)', moderate: 'Moderate (5-15 yrs)', old: 'Old (15-30 yrs)', vintage: 'Vintage (30+ yrs)' };
+
+      const metadata = data.metadata || {};
+      const surfaceTypesArr = Array.isArray(data.surface_types)
+        ? data.surface_types
+        : (typeof data.surface_types === 'string' ? JSON.parse(data.surface_types) : []);
+      const surfaceTypesStr = surfaceTypesArr.map(s => surfaceLabelsPdf[s] || s).join(', ') || 'N/A';
+      const equipmentStr = (metadata.equipment || []).map(e => equipLabelsPdf[e] || e).join(', ') || 'None';
+      const preferencesStr = (metadata.preferences || []).map(p => prefLabelsPdf[p] || p).join(', ') || 'None';
+      const freqStr = freqLabelsPdf[metadata.cleaning_frequency] || metadata.cleaning_frequency || 'N/A';
+      const hygieneStr = (data.hygiene_standard || '').replace(/_/g, ' ') || 'N/A';
+      const budgetStr = data.budget || data.budget_level || 'N/A';
+      const areaSizeStr = data.area_size ? Number(data.area_size).toLocaleString() : 'N/A';
+      const opHoursStr = hoursMapPdf[metadata.operating_hours] || metadata.operating_hours || 'N/A';
+      const ageStr = ageMapPdf[metadata.facility_age] || metadata.facility_age || 'N/A';
+
+      // ── Product table (reusing rowsHtml from above) ──
+      const productTableHtml = `
+        <table style="width:100%;border-collapse:collapse;margin-top:12px;font-family:Arial,sans-serif;">
+          <thead>
+            <tr style="background:#0f766e;color:white;">
+              <th style="padding:8px 6px;text-align:center;font-size:10px;font-weight:600;width:24px;">#</th>
+              <th style="padding:8px 6px;text-align:left;font-size:10px;font-weight:600;">Product</th>
+              <th style="padding:8px 6px;text-align:center;font-size:10px;font-weight:600;width:55px;">Category</th>
+              <th style="padding:8px 6px;text-align:center;font-size:10px;font-weight:600;width:38px;">Qty</th>
+              <th style="padding:8px 6px;text-align:center;font-size:10px;font-weight:600;width:65px;">Dilution</th>
+              <th style="padding:8px 6px;text-align:right;font-size:10px;font-weight:600;width:65px;">Unit Price</th>
+              <th style="padding:8px 6px;text-align:right;font-size:10px;font-weight:600;width:70px;">Monthly</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml || '<tr><td colspan="7" style="text-align:center;padding:20px;color:#94a3b8;font-size:11px;">No products in this quotation.</td></tr>'}
+          </tbody>
+          <tfoot>
+            <tr style="background:#f0fdfa;">
+              <td colspan="4" style="padding:10px 8px;border-top:2px solid #0f766e;font-size:12px;font-weight:700;color:#0f172a;">Total Monthly Estimate (${items.length} product${items.length !== 1 ? 's' : ''})</td>
+              <td style="padding:10px 8px;border-top:2px solid #0f766e;"></td>
+              <td style="padding:10px 8px;border-top:2px solid #0f766e;"></td>
+              <td style="padding:10px 8px;border-top:2px solid #0f766e;text-align:right;font-size:14px;font-weight:700;color:#059669;">Rs ${totalCost.toLocaleString('en-IN')}</td>
+            </tr>
+          </tfoot>
+        </table>
       `;
 
-      pdfStyles = document.createElement('style');
-      pdfStyles.id = 'pdf-export-styles';
-      pdfStyles.textContent = cssText;
-      document.head.appendChild(pdfStyles);
-
-      // ── Build just the body content (no DOCTYPE, html, head, body wrappers) ──
-      const safetyAlertsHtml = items.filter(item => item.alerts && Array.isArray(item.alerts) && item.alerts.length > 0).length > 0
-        ? items.filter(item => item.alerts && Array.isArray(item.alerts) && item.alerts.length > 0)
-            .map(item => {
-              const safeName = escapeHtml(item.product_name || 'Product');
-              const alertBadges = item.alerts.map(a => `<span class="pdf-safety-badge">${escapeHtml(a)}</span>`).join(' ');
-              return `<div style="margin-bottom:4px;padding:4px 0;border-bottom:1px solid #fecaca;">
-                <div style="font-size:10px;font-weight:600;color:#991b1b;margin-bottom:2px;">${safeName}</div>
-                <div>${alertBadges}</div>
-              </div>`;
-            }).join('')
-        : '';
-
+      // ── Build email-template-matching HTML (all inline styles) ──
       const bodyHtml = `
-        <div class="pdf-watermark">GANGA MAXX</div>
-        <div class="pdf-page">
-          <div class="pdf-header">
-            <div class="pdf-brand">
-              <h1>Ganga Maxx</h1>
-              <div class="tagline">AI Institutional Cleaning Product Selector</div>
+        <div style="font-family:Arial,sans-serif;max-width:794px;margin:0 auto;padding:20px;color:#334155;">
+          <!-- HEADER -->
+          <div style="background:#0f766e;color:white;padding:24px;border-radius:8px 8px 0 0;">
+            <h1 style="margin:0;font-size:24px;font-weight:800;">Ganga Maxx</h1>
+            <p style="margin:6px 0 0;opacity:0.85;font-size:14px;">Cleaning Product Recommendations</p>
+          </div>
+
+          <!-- CONTENT -->
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-top:0;padding:24px;border-radius:0 0 8px 8px;">
+
+            <!-- Contact Information -->
+            <h2 style="font-size:16px;color:#0f172a;border-bottom:2px solid #0d9488;padding-bottom:8px;margin:0 0 14px 0;font-weight:700;">Contact Information</h2>
+            <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+              <tr><td style="padding:6px 8px;color:#64748b;font-size:13px;">Name</td><td style="padding:6px 8px;font-weight:500;color:#1e293b;font-size:13px;">${escapeHtml(data.institution_name || 'N/A')}</td></tr>
+              <tr><td style="padding:6px 8px;color:#64748b;font-size:13px;">Email</td><td style="padding:6px 8px;font-weight:500;color:#1e293b;font-size:13px;">${escapeHtml(data.contact_email || 'N/A')}</td></tr>
+              <tr><td style="padding:6px 8px;color:#64748b;font-size:13px;">Phone</td><td style="padding:6px 8px;font-weight:500;color:#1e293b;font-size:13px;">${escapeHtml(data.contact_phone || 'N/A')}</td></tr>
+              <tr><td style="padding:6px 8px;color:#64748b;font-size:13px;">Facility</td><td style="padding:6px 8px;font-weight:500;color:#1e293b;font-size:13px;">${escapeHtml(data.institution_name || 'N/A')}</td></tr>
+              <tr><td style="padding:6px 8px;color:#64748b;font-size:13px;">Address</td><td style="padding:6px 8px;font-weight:500;color:#1e293b;font-size:13px;">${escapeHtml(data.address || 'N/A')}</td></tr>
+            </table>
+
+            <!-- Facility Profile -->
+            <h2 style="font-size:16px;color:#0f172a;border-bottom:2px solid #0d9488;padding-bottom:8px;margin:18px 0 14px 0;font-weight:700;">Facility Profile</h2>
+            <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+              <tr><td style="padding:6px 8px;color:#64748b;font-size:13px;">Type</td><td style="padding:6px 8px;font-weight:500;color:#1e293b;font-size:13px;text-transform:capitalize;">${escapeHtml((data.institution_type || '').replace(/_/g, ' ') || 'N/A')}</td></tr>
+              <tr><td style="padding:6px 8px;color:#64748b;font-size:13px;">Area</td><td style="padding:6px 8px;font-weight:500;color:#1e293b;font-size:13px;">${areaSizeStr} sq. ft.</td></tr>
+              <tr><td style="padding:6px 8px;color:#64748b;font-size:13px;">Budget</td><td style="padding:6px 8px;font-weight:500;color:#1e293b;font-size:13px;text-transform:capitalize;">${escapeHtml(budgetStr)}</td></tr>
+              <tr><td style="padding:6px 8px;color:#64748b;font-size:13px;">Surfaces</td><td style="padding:6px 8px;font-weight:500;color:#1e293b;font-size:13px;">${escapeHtml(surfaceTypesStr)}</td></tr>
+              <tr><td style="padding:6px 8px;color:#64748b;font-size:13px;">Hygiene</td><td style="padding:6px 8px;font-weight:500;color:#1e293b;font-size:13px;text-transform:capitalize;">${escapeHtml(hygieneStr)}</td></tr>
+              <tr><td style="padding:6px 8px;color:#64748b;font-size:13px;">Frequency</td><td style="padding:6px 8px;font-weight:500;color:#1e293b;font-size:13px;">${escapeHtml(freqStr)}</td></tr>
+              <tr><td style="padding:6px 8px;color:#64748b;font-size:13px;">Equipment</td><td style="padding:6px 8px;font-weight:500;color:#1e293b;font-size:13px;">${escapeHtml(equipmentStr)}</td></tr>
+              <tr><td style="padding:6px 8px;color:#64748b;font-size:13px;">Preferences</td><td style="padding:6px 8px;font-weight:500;color:#1e293b;font-size:13px;">${escapeHtml(preferencesStr)}</td></tr>
+              ${metadata.floors ? `<tr><td style="padding:6px 8px;color:#64748b;font-size:13px;">Floors</td><td style="padding:6px 8px;font-weight:500;color:#1e293b;font-size:13px;">${escapeHtml(String(metadata.floors))}</td></tr>` : ''}
+              ${metadata.occupants ? `<tr><td style="padding:6px 8px;color:#64748b;font-size:13px;">Occupants</td><td style="padding:6px 8px;font-weight:500;color:#1e293b;font-size:13px;">${escapeHtml(String(metadata.occupants))}+</td></tr>` : ''}
+              ${opHoursStr !== 'N/A' ? `<tr><td style="padding:6px 8px;color:#64748b;font-size:13px;">Operating Hours</td><td style="padding:6px 8px;font-weight:500;color:#1e293b;font-size:13px;">${escapeHtml(opHoursStr)}</td></tr>` : ''}
+              ${ageStr !== 'N/A' ? `<tr><td style="padding:6px 8px;color:#64748b;font-size:13px;">Facility Age</td><td style="padding:6px 8px;font-weight:500;color:#1e293b;font-size:13px;">${escapeHtml(ageStr)}</td></tr>` : ''}
+            </table>
+
+            <!-- Recommendations / Summary -->
+            <h2 style="font-size:16px;color:#0f172a;border-bottom:2px solid #0d9488;padding-bottom:8px;margin:18px 0 14px 0;font-weight:700;">Recommendations</h2>
+
+            ${safeSummary ? `<p style="font-size:13px;color:#475569;line-height:1.5;margin:0 0 12px;">${safeSummary}</p>` : ''}
+
+            <!-- Product Table -->
+            ${productTableHtml}
+
+            <p style="font-size:14px;font-weight:bold;color:#059669;margin:14px 0 4px;">Rs ${totalCost.toLocaleString('en-IN')}/month</p>
+            <p style="font-size:12px;color:#64748b;margin:0 0 16px;">${items.length} product(s) recommended</p>
+
+            <!-- Safety Alerts -->
+            ${items.filter(item => item.alerts && Array.isArray(item.alerts) && item.alerts.length > 0).length > 0 ? `
+            <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:12px;margin-top:12px;">
+              <p style="font-size:13px;font-weight:600;color:#b91c1c;margin:0 0 6px;">⚠ Safety &amp; Handling Alerts</p>
+              ${items.filter(item => item.alerts && Array.isArray(item.alerts) && item.alerts.length > 0).map(item => {
+                const sn = escapeHtml(item.product_name || 'Product');
+                const badges = item.alerts.map(a => `<span style="display:inline-block;padding:1px 6px;border-radius:2px;font-size:9px;font-weight:600;background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;margin:1px 2px 1px 0;">${escapeHtml(a)}</span>`).join(' ');
+                return `<div style="margin-bottom:4px;padding:4px 0;border-bottom:1px solid #fecaca;">
+                  <div style="font-size:11px;font-weight:600;color:#991b1b;margin-bottom:2px;">${sn}</div>
+                  <div>${badges}</div>
+                </div>`;
+              }).join('')}
+              <div style="font-size:9px;color:#b91c1c;margin-top:4px;opacity:0.7;">Refer to product Safety Data Sheet (SDS) for complete safety information.</div>
+            </div>` : ''}
+
+            <!-- Financial Alert -->
+            ${safeFinancialAlert ? `
+            <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:12px;margin-top:12px;">
+              <p style="font-size:13px;font-weight:600;color:#d97706;margin:0 0 4px;">Financial Notice</p>
+              <p style="font-size:11px;color:#92400e;line-height:1.5;margin:0;">${safeFinancialAlert}</p>
+            </div>` : ''}
+
+            <!-- Footer -->
+            <div style="text-align:center;padding-top:20px;margin-top:24px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;line-height:1.6;">
+              <p style="margin:0;">Generated by <strong>Ganga Maxx</strong> &mdash; AI Institutional Cleaning Product Selector</p>
+              <p style="margin:4px 0 0;">${new Date().toLocaleString('en-IN')}</p>
             </div>
-            <div class="pdf-doc-info">
-              <h2>Product Quotation</h2>
-              <div class="meta">Date: ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
-              <div class="meta">Ref: QTN-${safeInstName.substring(0, 4).toUpperCase()}-${Date.now().toString().slice(-6)}</div>
-            </div>
-          </div>
-
-          <div class="pdf-summary-grid">
-            <div class="pdf-summary-box"><div class="lbl">Facility</div><div class="val">${safeInstName}</div></div>
-            <div class="pdf-summary-box"><div class="lbl">Type</div><div class="val" style="text-transform:capitalize;">${safeInstType}</div></div>
-            <div class="pdf-summary-box"><div class="lbl">Area</div><div class="val">${data.area_size ? Number(data.area_size).toLocaleString() + ' sq.ft' : '-'}</div></div>
-            <div class="pdf-summary-box"><div class="lbl">Monthly Cost</div><div class="val accent">Rs ${totalCost.toLocaleString('en-IN')}</div></div>
-          </div>
-
-          <table class="pdf-table">
-            <thead>
-              <tr>
-                <th class="center" style="width:28px;">#</th>
-                <th>Product Name</th>
-                <th class="center" style="width:70px;">Category</th>
-                <th class="center" style="width:50px;">Qty</th>
-                <th class="center" style="width:80px;">Dilution</th>
-                <th class="right" style="width:75px;">Unit Price</th>
-                <th class="right" style="width:80px;">Monthly Cost</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rowsHtml || '<tr><td colspan="7" style="text-align:center;padding:20px;color:#94a3b8;font-size:11px;">No products in this quotation.</td></tr>'}
-            </tbody>
-            <tfoot>
-              <tr class="total-row">
-                <td colspan="5">Total Monthly Estimate (${items.length} product${items.length !== 1 ? 's' : ''})</td>
-                <td class="right"></td>
-                <td class="accent">Rs ${totalCost.toLocaleString('en-IN')}</td>
-              </tr>
-            </tfoot>
-          </table>
-
-          ${safetyAlertsHtml ? `<div class="pdf-section" style="border-color:#fecaca;background:#fef2f2;">
-            <div class="stitle" style="color:#dc2626;">⚠ Safety & Handling Alerts</div>
-            ${safetyAlertsHtml}
-            <div style="font-size:8px;color:#b91c1c;margin-top:4px;opacity:0.7;">Refer to product Safety Data Sheet (SDS) for complete safety information.</div>
-          </div>` : ''}
-
-          ${safeSummary ? `<div class="pdf-section">
-            <div class="stitle">Summary</div>
-            <div class="stext">${safeSummary}</div>
-          </div>` : ''}
-
-          ${safeFinancialAlert ? `<div class="pdf-section" style="border-color:#fde68a;background:#fffbeb;">
-            <div class="stitle" style="color:#d97706;">Financial Notice</div>
-            <div class="stext" style="color:#92400e;">${safeFinancialAlert}</div>
-          </div>` : ''}
-
-          <div class="pdf-terms">
-            <strong>Terms & Conditions:</strong> Prices are indicative and may vary based on order quantity, delivery location, and current market rates. All recommendations are AI-generated based on facility profile. GST and other taxes applicable as per government regulations. Valid for 30 days from the date of generation.
-          </div>
-
-          <div class="pdf-footer">
-            <div><strong>Ganga Maxx</strong> &mdash; AI Institutional Cleaning Product Selector</div>
-            <div>This quotation was generated by our AI engine based on your facility profile.</div>
-            <div style="margin-top:3px;">Generated on ${new Date().toLocaleString('en-IN')} &bull; Valid for 30 days</div>
           </div>
         </div>
       `;
@@ -212,12 +232,12 @@ export default function Recommendations() {
       pdfContainer = document.createElement('div');
       pdfContainer.id = 'pdf-export-container';
       pdfContainer.innerHTML = bodyHtml;
-      // Position on-screen but nearly invisible — html2canvas cannot capture off-screen or negative-z elements reliably
-      pdfContainer.style.cssText = 'position:fixed;top:0;left:0;width:794px;background:#ffffff;z-index:2147483647;opacity:0.01;pointer-events:none;';
+      // Render fully visible at top-left — html2canvas cannot capture invisible or off-screen elements
+      pdfContainer.style.cssText = 'position:fixed;top:0;left:0;width:794px;background:#ffffff;z-index:2147483647;opacity:1;pointer-events:none;';
       document.body.appendChild(pdfContainer);
 
-      // Small delay to let the browser parse and apply the injected styles
-      await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 100)));
+      // Small delay to let the browser render the content
+      await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 150)));
 
       const fileName = `quotation-${instName.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}.pdf`;
       const opt = {
@@ -250,9 +270,7 @@ export default function Recommendations() {
       if (pdfContainer && pdfContainer.parentNode) {
         pdfContainer.parentNode.removeChild(pdfContainer);
       }
-      if (pdfStyles && pdfStyles.parentNode) {
-        pdfStyles.parentNode.removeChild(pdfStyles);
-      }
+
       setDownloading(false);
     }
   };
