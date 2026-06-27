@@ -5,7 +5,7 @@ import ProductCard from '../components/ProductCard';
 import LoadingState from '../components/LoadingState';
 import ErrorState from '../components/ErrorState';
 import { sendReportToEmail, isEmailJSConfigured } from '../services/emailService';
-import html2pdf from 'html2pdf.js';
+
 
 export default function Recommendations() {
   const { id } = useParams();
@@ -232,33 +232,32 @@ export default function Recommendations() {
       pdfContainer = document.createElement('div');
       pdfContainer.id = 'pdf-export-container';
       pdfContainer.innerHTML = bodyHtml;
-      // Render fully visible at top-left — html2canvas cannot capture invisible or off-screen elements
+      // Place on-screen with full opacity — html2canvas cannot capture off-screen or transparent elements reliably
       pdfContainer.style.cssText = 'position:fixed;top:0;left:0;width:794px;background:#ffffff;z-index:2147483647;opacity:1;pointer-events:none;';
       document.body.appendChild(pdfContainer);
 
       // Small delay to let the browser render the content
-      await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 150)));
+      await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 300)));
 
       const fileName = `quotation-${instName.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}.pdf`;
-      const opt = {
-        margin: [0, 0, 0, 0],
-        filename: fileName,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: {
-          scale: 2,
-          useCORS: true,
-          allowTaint: true,
-          letterRendering: true,
-          backgroundColor: '#ffffff',
-          width: 794,
-          logging: false,
-          windowWidth: 794
-        },
-        jsPDF: { unit: 'px', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-      };
 
-      await html2pdf().set(opt).from(pdfContainer).save();
+      const { default: html2pdf } = await import('html2pdf.js');
+      await html2pdf()
+        .set({
+          margin: [8, 6, 8, 6],
+          filename: fileName,
+          image: { type: 'jpeg', quality: 0.95 },
+          html2canvas: {
+            scale: 2,
+            useCORS: true,
+            letterRendering: true,
+            backgroundColor: '#ffffff'
+          },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+          pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+        })
+        .from(pdfContainer)
+        .save();
       setToast({ type: 'success', message: 'PDF downloaded successfully!' });
       setTimeout(() => setToast(null), 5000);
     } catch (err) {

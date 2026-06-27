@@ -202,49 +202,17 @@ export async function sendFormWithReportEmail(formData, recommendationData) {
   const templateParams = {
     // ── Recipient ──
     to_email: formData.contact_email,
-    // ── Common / generic names (for template compatibility) ──
-    name: formData.contact_name || 'N/A',
+    // ── For EmailJS subject line / salutation ──
+    name: formData.contact_name || formData.name || 'Valued Customer',
     email: formData.contact_email || 'N/A',
-    phone: formData.contact_phone || 'N/A',
-    facility: formData.name || 'N/A',
-    address: formData.address || 'N/A',
-    type: formData.institution_type || 'N/A',
-    area: areaSizeLabel,
     message: recommendationData?.summary || 'Recommendation generated successfully.',
-    // ── Original specific names (backward compat) ──
-    contact_name: formData.contact_name || 'N/A',
-    contact_phone: formData.contact_phone || 'N/A',
-    contact_email: formData.contact_email || 'N/A',
-    facility_address: formData.address || 'N/A',
-    facility_name: formData.name,
-    institution_type: formData.institution_type || 'N/A',
-    area_size: areaSizeLabel,
-    floors: String(formData.floors || 1),
-    occupants: String(formData.occupants || 'N/A'),
-    operating_hours: operatingHoursLabel,
-    facility_description: formData.facility_description || '',
-    surface_types: surfaceTypesLabel,
-    hygiene_standard: hygieneLabel,
-    budget: formData.budget || 'N/A',
-    cleaning_frequency: frequencyLabels[formData.cleaning_frequency] || formData.cleaning_frequency || 'N/A',
-    facility_age: facilityAgeLabel,
-    equipment: equipmentLabel,
-    preferences: preferencesLabel,
-    special_requirements: formData.special_requirements || '',
-    current_products: formData.current_products || '',
-    // ── Recommendation data ──
+    // ── Summary numbers (for subject line) ──
     recommendation_summary: recommendationData?.summary || 'Recommendation generated successfully.',
     total_cost: 'Rs ' + Number(totalCost).toLocaleString('en-IN') + '/month',
     item_count: String(items.length),
-    // ── HTML blocks ──
     alerts_text: alerts.length > 0 ? alerts.join('\n• ') : 'None',
-    alerts_html: alerts.length > 0 ? alerts.map(a => '<li>' + a + '</li>').join('') : '<li>No alerts</li>',
-    product_details_html: items.length > 0 ? buildProductTable(productRows, totalCost) : '<p>No product recommendations.</p>',
-    contact_info_html: contactInfoHtml.length > 0 ? '<table style="width:100%;border-collapse:collapse;margin-bottom:8px;">' + contactInfoHtml.join('') + '</table>' : '<p style="color:#94a3b8;font-size:13px;">No contact information provided</p>',
-    facility_info_html: '<table style="width:100%;border-collapse:collapse;margin-bottom:8px;">' + facilityInfoHtml.join('') + '</table>',
-    optional_fields_html: optionalFieldsHtml.length > 0 ? '<table style="width:100%;border-collapse:collapse;margin-top:8px;">' + optionalFieldsHtml.join('') + '</table>' : '',
-    all_info_html: '<table style="width:100%;border-collapse:collapse;">' + allInfoRows + '</table>',
-    // ── COMPLETE HTML EMAIL BODY (use {{full_email_html}} in your template) ──
+    // ── COMPLETE SELF-CONTAINED HTML BODY ──
+    // Use {{{full_email_html}}} (triple braces) in your EmailJS template to render without escaping
     full_email_html: fullEmailHtml,
   };
 
@@ -379,44 +347,15 @@ export async function sendReportToEmail(recipientEmail, recipientName, reportDat
   const templateParams = {
     // ── Recipient ──
     to_email: recipientEmail,
-    // ── Common / generic names (for template compatibility) ──
+    // ── For EmailJS subject line / salutation ──
     name: recipientName || 'Valued Customer',
     email: recipientEmail,
-    phone: reportData?.contact_phone || 'N/A',
-    facility: instName,
-    address: reportData?.address || 'N/A',
-    type: reportData?.institution_type || 'N/A',
-    area: areaSizeLabel,
     message: reportData?.summary || 'Recommendation generated successfully.',
-    // ── Original specific names (backward compat) ──
-    contact_name: recipientName || 'Valued Customer',
-    contact_phone: reportData?.contact_phone || 'N/A',
-    contact_email: recipientEmail,
-    facility_address: reportData?.address || 'N/A',
-    facility_name: instName,
-    institution_type: reportData?.institution_type || 'N/A',
-    area_size: areaSizeLabel,
-    floors: String(metadata.floors || 1),
-    occupants: String(metadata.occupants || 'N/A'),
-    operating_hours: operatingHoursLabel,
-    facility_description: metadata.facility_description || '',
-    surface_types: surfaceTypesLabel,
-    hygiene_standard: hygieneLabel,
-    budget: budgetLabel,
-    cleaning_frequency: frequencyLabel,
-    facility_age: facilityAgeLabel,
-    equipment: equipmentLabel,
-    preferences: preferencesLabel,
-    special_requirements: metadata.special_requirements || '',
-    current_products: metadata.current_products || '',
-    // ── Recommendation data ──
+    // ── Summary numbers (for subject line) ──
     recommendation_summary: reportData?.summary || 'Your personalized cleaning product recommendations.',
     total_cost: 'Rs ' + Number(totalCost).toLocaleString('en-IN') + '/month',
     item_count: String(items.length),
-    // ── HTML blocks ──
     alerts_text: alerts.length > 0 ? alerts.join('\n• ') : 'None',
-    alerts_html: alerts.length > 0 ? alerts.map(a => '<li>' + a + '</li>').join('') : '<li>No alerts</li>',
-    product_details_html: items.length > 0 ? buildProductTable(productRows, totalCost) : '<p>No product recommendations.</p>',
     // ── Complete self-contained HTML — use {{{full_email_html}}} in your EmailJS template ──
     full_email_html: fullEmailHtml,
   };
