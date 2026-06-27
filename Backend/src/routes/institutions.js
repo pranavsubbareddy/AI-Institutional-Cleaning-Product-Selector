@@ -98,7 +98,18 @@ router.get('/', validatePagination, async (req, res) => {
 
 router.get('/:id', async (req, res) => {
   try {
-    const institution = await queryOne('SELECT * FROM institutions WHERE id = ? AND user_id = ?', [req.params.id, req.user.uid]);
+    // First try to find the institution by id AND user_id (owned by current user)
+    let institution = await queryOne('SELECT * FROM institutions WHERE id = ? AND user_id = ?', [req.params.id, req.user.uid]);
+
+    // If not found by user_id, fallback to contact_email match (same behavior as /dashboard/institutions)
+    if (!institution && req.user.email) {
+      institution = await queryOne('SELECT * FROM institutions WHERE id = ? AND contact_email = ?', [req.params.id, req.user.email.toLowerCase().trim()]);
+      if (institution) {
+        // Backfill user_id so future operations work correctly
+        await run('UPDATE institutions SET user_id = ? WHERE id = ?', [req.user.uid, req.params.id]);
+      }
+    }
+
     if (!institution) {
       return res.status(404).json({
         success: false,
@@ -134,7 +145,18 @@ router.get('/:id', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   try {
-    const existing = await queryOne('SELECT * FROM institutions WHERE id = ? AND user_id = ?', [req.params.id, req.user.uid]);
+    // First try to find the institution by id AND user_id (owned by current user)
+    let existing = await queryOne('SELECT * FROM institutions WHERE id = ? AND user_id = ?', [req.params.id, req.user.uid]);
+
+    // If not found by user_id, fallback to contact_email match (same behavior as /dashboard/institutions)
+    if (!existing && req.user.email) {
+      existing = await queryOne('SELECT * FROM institutions WHERE id = ? AND contact_email = ?', [req.params.id, req.user.email.toLowerCase().trim()]);
+      if (existing) {
+        // Backfill user_id so future operations work correctly
+        await run('UPDATE institutions SET user_id = ? WHERE id = ?', [req.user.uid, req.params.id]);
+      }
+    }
+
     if (!existing) {
       return res.status(404).json({
         success: false,
@@ -189,7 +211,18 @@ router.put('/:id', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   try {
-    const existing = await queryOne('SELECT * FROM institutions WHERE id = ? AND user_id = ?', [req.params.id, req.user.uid]);
+    // First try to find the institution by id AND user_id (owned by current user)
+    let existing = await queryOne('SELECT * FROM institutions WHERE id = ? AND user_id = ?', [req.params.id, req.user.uid]);
+
+    // If not found by user_id, fallback to contact_email match (same behavior as /dashboard/institutions)
+    if (!existing && req.user.email) {
+      existing = await queryOne('SELECT * FROM institutions WHERE id = ? AND contact_email = ?', [req.params.id, req.user.email.toLowerCase().trim()]);
+      if (existing) {
+        // Backfill user_id so future operations work correctly
+        await run('UPDATE institutions SET user_id = ? WHERE id = ?', [req.user.uid, req.params.id]);
+      }
+    }
+
     if (!existing) {
       return res.status(404).json({
         success: false,
@@ -197,7 +230,7 @@ router.delete('/:id', async (req, res) => {
         timestamp: new Date().toISOString()
       });
     }
-    await run('DELETE FROM institutions WHERE id = ? AND user_id = ?', [req.params.id, req.user.uid]);
+    await run('DELETE FROM institutions WHERE id = ?', [req.params.id]);
     res.json({
       success: true,
       message: 'Institution deleted successfully',
