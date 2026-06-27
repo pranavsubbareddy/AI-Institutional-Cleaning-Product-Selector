@@ -6,7 +6,7 @@ const { v4: uuidv4 } = require('uuid');
 const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
 const { generateToken, COOKIE_OPTIONS, JWT_SECRET } = require('../middleware/auth');
-const { queryOne, run } = require('../database/schema');
+const { queryOne, run, backfillUserInstitutionsByEmail } = require('../database/schema');
 const {
   sendVerificationEmail,
   sendWelcomeEmail,
@@ -77,6 +77,9 @@ router.post('/signup', async (req, res, next) => {
       user.age = age ? Number(age) : null;
       user.gender = gender || '';
 
+      // Backfill institutions by contact_email to link them to this user
+      backfillUserInstitutionsByEmail(normalizedEmail, user.uid);
+
       const token = generateToken(user);
       res.cookie('token', token, COOKIE_OPTIONS);
 
@@ -108,6 +111,9 @@ router.post('/signup', async (req, res, next) => {
       phone: phone || '', age: age ? Number(age) : null, gender: gender || '',
       photoURL: null, provider: 'password', emailVerified: false, createdAt
     };
+
+    // Backfill institutions by contact_email to link them to this user
+    backfillUserInstitutionsByEmail(normalizedEmail, uid);
 
     const token = generateToken(user);
     res.cookie('token', token, COOKIE_OPTIONS);
@@ -190,6 +196,9 @@ router.post('/login', async (req, res, next) => {
         createdAt: new Date().toISOString()
       };
 
+      // Backfill institutions by contact_email to link them to this user
+      backfillUserInstitutionsByEmail(normalizedEmail, portalUser.uid);
+
       const token = generateToken(portalUser);
       res.cookie('token', token, COOKIE_OPTIONS);
 
@@ -212,6 +221,9 @@ router.post('/login', async (req, res, next) => {
     }
 
     const user = stripPassword(record);
+
+    // Backfill institutions by contact_email to link them to this user
+    backfillUserInstitutionsByEmail(normalizedEmail, user.uid);
 
     const token = generateToken(user);
     res.cookie('token', token, COOKIE_OPTIONS);
@@ -878,6 +890,10 @@ router.post('/google', async (req, res) => {
     }
 
     const user = stripPassword(record);
+
+    // Backfill institutions by contact_email to link them to this user
+    backfillUserInstitutionsByEmail(email, user.uid);
+
     const authToken = generateToken(user);
     res.cookie('token', authToken, COOKIE_OPTIONS);
 

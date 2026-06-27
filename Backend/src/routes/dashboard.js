@@ -145,12 +145,35 @@ router.get('/summary', async (req, res, next) => {
 router.get('/institutions', async (req, res, next) => {
   try {
     const uid = req.user.uid;
+    const userEmail = req.user.email || '';
 
-    // Step 1: Fetch all institutions for this user (simple query, no JOINs/subqueries)
+    // Step 1: Fetch all institutions for this user (by user_id OR by contact_email)
+    // This ensures institutions created under a different auth provider (e.g. Google vs password)
+    // but with the same email address still appear in the dashboard.
     const institutions = await queryAll(
       `SELECT * FROM institutions WHERE user_id = ? ORDER BY created_at DESC`,
       [uid]
     );
+
+    // Also fetch institutions that match by contact_email but aren't linked to this uid
+    // (Emails are already normalized to lowercase during auth)
+    if (userEmail) {
+      const emailInsts = await queryAll(
+        `SELECT * FROM institutions WHERE contact_email = ? AND user_id != ? ORDER BY created_at DESC`,
+        [userEmail.toLowerCase().trim(), uid]
+      );
+      // Merge email-matched institutions with uid-matched ones (dedup by id)
+      if (emailInsts.length > 0) {
+        const existingIds = new Set(institutions.map(i => i.id));
+        for (const inst of emailInsts) {
+          if (!existingIds.has(inst.id)) {
+            institutions.push(inst);
+          }
+        }
+        // Re-sort by created_at after merging
+        institutions.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+      }
+    }
 
     // Step 2: Fetch recommendations for these institutions and build a lookup map
     const instIds = institutions.map(i => i.id);

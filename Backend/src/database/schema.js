@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const mysql = require('mysql2/promise');
 
 let pool = null;
@@ -13,17 +14,17 @@ const memoryTables = {};
 let saveTimer = null;
 let savePending = false;
 
-// Resolve the data.json path — try project root first, then /tmp for Vercel
+// Resolve the data.json path — try project root first, then os.tmpdir() for Vercel
 function getDataFilePath() {
   return path.join(__dirname, '..', '..', '..', 'data.json');
 }
 function getTempDataFilePath() {
-  return path.join('/tmp', 'data.json');
+  return path.join(os.tmpdir(), 'data.json');
 }
 
 // Load ALL pre-seeded data from data.json (if available)
 function seedFromDisk() {
-  // Try /tmp/data.json first (Vercel warm instance with persisted data), then project-root data.json (seed)
+  // Try os.tmpdir()/data.json first (Vercel warm instance with persisted data), then project-root data.json (seed)
   const candidates = [getTempDataFilePath(), getDataFilePath()];
   for (const dataFile of candidates) {
     try {
@@ -90,13 +91,13 @@ function seedFromDisk() {
 // Reload tables from disk into memory (overwriting any in-memory state).
 // Required on serverless platforms where each invocation may be a different
 // instance — without this, a POST handled by instance A is invisible to a GET
-// handled by instance B because /tmp/data.json was written by A but never
+// handled by instance B because os.tmpdir()/data.json was written by A but never
 // re-read by B. Call before every query to keep cross-instance state coherent.
 //
-// On Vercel, /tmp/data.json is the authoritative runtime store. The bundled
+// On Vercel, os.tmpdir()/data.json is the authoritative runtime store. The bundled
 // project-root data.json is consulted ONLY as a seed source on first cold
 // start. To survive deletes across cold starts, we also persist a
-// "tombstone" set in /tmp/inst_deletions.json — IDs of institutions that
+// "tombstone" set in os.tmpdir()/inst_deletions.json — IDs of institutions that
 // have been deleted. On every reload we strip those IDs out of the seed.
 let diskMtimeMs = 0;
 let deletionsMtimeMs = 0;
@@ -108,7 +109,7 @@ function reloadFromDiskIfChanged() {
 
     let tmpMtime = 0;
     let tmpExists = false;
-    try { tmpMtime = fs.statSync(tmpPath).mtimeMs; tmpExists = true; } catch { /* /tmp not present */ }
+    try { tmpMtime = fs.statSync(tmpPath).mtimeMs; tmpExists = true; } catch { /* temp file not present */ }
 
     let snapshotPath = null;
     let snapshotMtime = 0;
@@ -116,7 +117,7 @@ function reloadFromDiskIfChanged() {
       snapshotPath = tmpPath;
       snapshotMtime = tmpMtime;
     } else {
-      // Cold start with no /tmp — only consult bundled seed.
+      // Cold start with no temp data — only consult bundled seed.
       try {
         const s2 = fs.statSync(rootPath);
         snapshotPath = rootPath;
@@ -139,7 +140,7 @@ function reloadFromDiskIfChanged() {
 }
 
 function getDeletionTombstonePath() {
-  return path.join('/tmp', 'inst_deletions.json');
+  return path.join(os.tmpdir(), 'inst_deletions.json');
 }
 
 function applyDeletionTombstones() {
@@ -160,8 +161,8 @@ function applyDeletionTombstones() {
   } catch { /* no tombstone file yet — normal */ }
 }
 
-function applyDiskSnapshot(path) {
-  const raw = fs.readFileSync(path, 'utf-8');
+function applyDiskSnapshot(snapshotPath) {
+  const raw = fs.readFileSync(snapshotPath, 'utf-8');
   const data = JSON.parse(raw);
   const tableMap = {
     INST: 'institutions',
@@ -204,7 +205,7 @@ function applyDiskSnapshot(path) {
 function recordDeletion(id) {
   try {
     const p = getDeletionTombstonePath();
-    // Ensure the parent directory exists (e.g., /tmp/ on *nix, C:\tmp\ on Windows)
+    // Ensure the parent directory exists
     const dir = path.dirname(p);
     if (!fs.existsSync(dir)) {
       try { fs.mkdirSync(dir, { recursive: true }); } catch { /* best-effort */ }
@@ -223,7 +224,7 @@ function recordDeletion(id) {
 }
 
 // Save ALL memory tables back to data.json (debounced)
-// On Vercel (read-only project filesystem), falls back to /tmp/data.json
+// On Vercel (read-only project filesystem), falls back to os.tmpdir()/data.json
 function saveToDisk() {
   if (savePending) return;
   savePending = true;
@@ -596,7 +597,14 @@ function memQueryAll(sql, params) {
           }
         }
         everWritten = true;
+        // Flush immediately — critical for persistence across requests
         flushMemoryToDisk();
+        // Also sync the tombstone file to ensure cold-start survival
+        const tombstonePath = getDeletionTombstonePath();
+        try {
+          const dir = path.dirname(tombstonePath);
+          if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        } catch { /* best-effort */ }
       }
       return { affectedRows: affected };
     }
@@ -843,7 +851,7 @@ async function initializeSchema() {
   await pool.execute(`CREATE TABLE IF NOT EXISTS tier_discounts (
     id VARCHAR(50) PRIMARY KEY,
     product_id VARCHAR(36) NOT NULL,
-    min_quantity DECIMAL(10,2) NOT NULL DEFAULT 0,
+    threshold_quantity DECIMAL(10,2) NOT NULL DEFAULT 0,
     max_quantity DECIMAL(10,2),
     discount_percent DECIMAL(5,2) NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -1150,4 +1158,49 @@ function safeJsonParse(value, fallback = null) {
   }
 }
 
-module.exports = { getPool, initializeSchema, queryAll, queryOne, run, closePool, safeJsonParse };
+// ── Backfill institution user_ids by contact_email ───────────────────────
+// After login/signup, associate any institutions that have a matching
+// contact_email but a different (or missing) user_id to the current user.
+// This ensures seed data or pre-existing institutions appear in the UI
+// regardless of which authentication method the user used.
+// Works with both the in-memory engine and MySQL mode.
+async function backfillUserInstitutionsByEmail(email, uid) {
+  if (!email || !uid) return 0;
+  const normalizedEmail = email.toLowerCase().trim();
+
+  if (!pool) {
+    // In-memory mode
+    const instTable = memTable('institutions');
+    let updated = 0;
+    instTable.forEach(row => {
+      const contactEmail = (row.contact_email || '').toLowerCase().trim();
+      if (contactEmail === normalizedEmail && row.user_id !== uid) {
+        row.user_id = uid;
+        updated++;
+      }
+    });
+    if (updated > 0) {
+      console.log(`  [backfill] Updated ${updated} institution(s) user_id -> ${uid} for email ${email}`);
+      flushMemoryToDisk();
+    }
+    return updated;
+  } else {
+    // MySQL mode
+    try {
+      const p = getPool();
+      const [result] = await p.execute(
+        'UPDATE institutions SET user_id = ? WHERE LOWER(TRIM(contact_email)) = ? AND (user_id IS NULL OR user_id != ?)',
+        [uid, normalizedEmail, uid]
+      );
+      if (result.affectedRows > 0) {
+        console.log(`  [backfill] Updated ${result.affectedRows} institution(s) user_id -> ${uid} for email ${email}`);
+      }
+      return result.affectedRows || 0;
+    } catch (err) {
+      console.warn('[backfill] MySQL update failed:', err.message);
+      return 0;
+    }
+  }
+}
+
+module.exports = { getPool, initializeSchema, queryAll, queryOne, run, closePool, safeJsonParse, backfillUserInstitutionsByEmail };
