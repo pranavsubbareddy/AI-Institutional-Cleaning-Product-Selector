@@ -204,11 +204,20 @@ router.post('/process', validateProcessBody, async (req, res, next) => {
       });
     }
 
-    // --- Try the live AI engine first (LangChain OpenAI / Gemini) ---
+    // --- Fetch existing product catalog for AI to reference ---
+    let existingProducts = [];
+    try {
+      existingProducts = await queryAll('SELECT id, sku, name, category, unit_price, coverage_per_unit, dilution_ratio, unit, safety_notes, usage_guidance FROM products ORDER BY created_at DESC');
+    } catch (catalogErr) {
+      // Non-fatal — AI can still generate products without catalog reference
+      console.warn('  [recs] Could not fetch product catalog:', catalogErr.message);
+    }
+
+    // --- Try the live AI engine first (LangChain/Groq) ---
     let aiResult = null;
     let aiError = null;
     try {
-      aiResult = await generateRecommendations(institution);
+      aiResult = await generateRecommendations(institution, existingProducts);
     } catch (err) {
       aiError = err;
       console.warn('  [recs] AI engine threw:', err.message);

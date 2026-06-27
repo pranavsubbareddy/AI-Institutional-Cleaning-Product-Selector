@@ -52,6 +52,8 @@ export default function Recommendations() {
   const handleDownloadPDF = async () => {
     if (!contentRef.current || downloading) return;
     setDownloading(true);
+    let pdfContainer = null;
+    let pdfStyles = null;
     try {
       const escapeHtml = (str) => String(str).replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
       const instName = data.institution_name || 'Recommendation';
@@ -61,7 +63,7 @@ export default function Recommendations() {
         const unitPrice = item.unit_price || item.base_price || 0;
         const monthlyCost = Number(item.monthly_cost || 0);
         const dilution = item.dilution_ratio || '-';
-        return `<tr style="${i % 2 === 0 ? 'background-color: #ffffff;' : 'background-color: #f8fafc;'}">
+        return `<tr style="${i % 2 === 0 ? 'background-color: #ffffff;' : 'background-color: #f0fdfa;'}">
           <td style="padding:10px 8px;border-bottom:1px solid #e2e8f0;text-align:center;font-size:11px;color:#475569;">${i + 1}</td>
           <td style="padding:10px 8px;border-bottom:1px solid #e2e8f0;font-size:11px;color:#1e293b;font-weight:500;">${escapeHtml(item.product_name || 'Product')}</td>
           <td style="padding:10px 8px;border-bottom:1px solid #e2e8f0;text-align:center;font-size:11px;color:#475569;">${escapeHtml(item.category || '-')}</td>
@@ -79,285 +81,143 @@ export default function Recommendations() {
       const safeSummary = data.summary ? escapeHtml(data.summary) : null;
       const safeFinancialAlert = data.financialStatusAlert ? escapeHtml(data.financialStatusAlert) : null;
       const safeInstType = escapeHtml((data.institution_type || '').replace(/_/g, ' '));
-      const html = `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Quotation - ${safeInstName}</title>
-<style>
-  * { box-sizing: border-box; }
-  body {
-    font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
-    background: #ffffff;
-    color: #334155;
-    margin: 0;
-    padding: 0;
-    font-size: 12px;
-    line-height: 1.5;
-  }
-  .page {
-    max-width: 190mm;
-    margin: 0 auto;
-    padding: 24px 28px;
-  }
-  .header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    padding-bottom: 16px;
-    margin-bottom: 20px;
-    border-bottom: 3px solid #0d9488;
-  }
-  .header .brand h1 {
-    font-size: 24px;
-    font-weight: 800;
-    color: #0f766e;
-    margin: 0 0 2px 0;
-    letter-spacing: -0.5px;
-  }
-  .header .brand .tagline {
-    font-size: 10px;
-    color: #64748b;
-    letter-spacing: 0.3px;
-  }
-  .header .doc-info {
-    text-align: right;
-  }
-  .header .doc-info h2 {
-    font-size: 18px;
-    font-weight: 700;
-    color: #0f172a;
-    margin: 0 0 4px 0;
-  }
-  .header .doc-info .date {
-    font-size: 10px;
-    color: #64748b;
-  }
-  .summary-grid {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 24px;
-    flex-wrap: wrap;
-  }
-  .summary-box {
-    background: #f0fdfa;
-    border: 1px solid #ccfbf1;
-    border-radius: 8px;
-    padding: 14px 18px;
-    flex: 1;
-    min-width: 110px;
-  }
-  .summary-box .lbl {
-    font-size: 9px;
-    text-transform: uppercase;
-    color: #64748b;
-    font-weight: 600;
-    letter-spacing: 0.8px;
-    margin-bottom: 4px;
-  }
-  .summary-box .val {
-    font-size: 16px;
-    font-weight: 700;
-    color: #0f172a;
-  }
-  .summary-box .val.accent {
-    color: #059669;
-  }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 20px 0;
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-  }
-  thead th {
-    background: #0f766e;
-    color: #ffffff;
-    padding: 12px 8px;
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    font-weight: 600;
-    text-align: left;
-  }
-  thead th.right { text-align: right; }
-  thead th.center { text-align: center; }
-  .total-row td {
-    padding: 14px 8px;
-    border-top: 2px solid #0f766e;
-    font-size: 13px;
-    color: #0f172a;
-    font-weight: 700;
-    background: #f0fdfa;
-  }
-  .total-row td.accent {
-    color: #059669;
-    font-size: 15px;
-    text-align: right;
-  }
-  .summary-section {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 16px 20px;
-    margin-top: 16px;
-  }
-  .summary-section .section-title {
-    font-size: 10px;
-    text-transform: uppercase;
-    color: #64748b;
-    font-weight: 600;
-    letter-spacing: 0.8px;
-    margin-bottom: 6px;
-  }
-  .summary-section .section-text {
-    color: #0f172a;
-    font-size: 12px;
-    line-height: 1.6;
-  }
-  .footer {
-    text-align: center;
-    padding-top: 20px;
-    margin-top: 24px;
-    border-top: 1px solid #e2e8f0;
-    font-size: 9px;
-    color: #94a3b8;
-    line-height: 1.6;
-  }
-  .watermark {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%) rotate(-30deg);
-    font-size: 80px;
-    color: rgba(13, 148, 136, 0.04);
-    font-weight: 900;
-    pointer-events: none;
-    z-index: -1;
-    letter-spacing: 10px;
-    overflow: hidden;
-  }
-  .badge {
-    display: inline-block;
-    padding: 2px 10px;
-    border-radius: 4px;
-    font-size: 9px;
-    font-weight: 600;
-    background: #f0fdfa;
-    color: #0d9488;
-    border: 1px solid #ccfbf1;
-  }
-  .safety-badge {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 3px;
-    font-size: 9px;
-    font-weight: 600;
-    background: #fef2f2;
-    color: #b91c1c;
-    border: 1px solid #fecaca;
-    margin: 1px 3px 1px 0;
-  }
-</style></head><body>
-  <div class="watermark">GANGA MAXX</div>
 
-  <div class="page">
-    <div class="header">
-      <div class="brand">
-        <h1>Ganga Maxx</h1>
-        <div class="tagline">AI Institutional Cleaning Product Selector</div>
-      </div>
-      <div class="doc-info">
-        <h2>Product Quotation</h2>
-        <div class="date">Date: ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
-        <div class="date" style="margin-top:2px;">Ref: QTN-${safeInstName.substring(0, 4).toUpperCase()}-${Date.now().toString().slice(-6)}</div>
-      </div>
-    </div>
+      // ── Inject CSS into the main document ──────────────────────────────
+      const cssText = `
+        * { box-sizing: border-box; }
+        body { font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; background: #ffffff; color: #334155; margin: 0; padding: 0; font-size: 12px; line-height: 1.5; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        @page { margin: 0; }
+        .pdf-page { max-width: 190mm; margin: 0 auto; padding: 20px 24px; position: relative; }
+        .pdf-header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 14px; margin-bottom: 18px; border-bottom: 3px solid #0d9488; position: relative; }
+        .pdf-header::after { content: ''; position: absolute; bottom: -3px; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, #0d9488, #14b8a6, #0d9488); }
+        .pdf-brand h1 { font-size: 22px; font-weight: 800; color: #0f766e; margin: 0 0 1px 0; letter-spacing: -0.5px; }
+        .pdf-brand .tagline { font-size: 9px; color: #64748b; letter-spacing: 0.3px; }
+        .pdf-doc-info { text-align: right; }
+        .pdf-doc-info h2 { font-size: 17px; font-weight: 700; color: #0f172a; margin: 0 0 3px 0; }
+        .pdf-doc-info .meta { font-size: 9px; color: #64748b; margin-top: 1px; }
+        .pdf-summary-grid { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .pdf-summary-box { background: #f0fdfa; border: 1px solid #ccfbf1; border-radius: 6px; padding: 10px 14px; flex: 1; min-width: 100px; }
+        .pdf-summary-box .lbl { font-size: 8px; text-transform: uppercase; color: #64748b; font-weight: 600; letter-spacing: 0.7px; margin-bottom: 3px; }
+        .pdf-summary-box .val { font-size: 14px; font-weight: 700; color: #0f172a; }
+        .pdf-summary-box .val.accent { color: #059669; }
+        .pdf-table { width: 100%; border-collapse: collapse; margin: 16px 0; border-radius: 6px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+        .pdf-table thead th { background: #0f766e; color: #ffffff; padding: 10px 7px; font-size: 9px; text-transform: uppercase; letter-spacing: 0.7px; font-weight: 600; text-align: left; }
+        .pdf-table thead th.right { text-align: right; }
+        .pdf-table thead th.center { text-align: center; }
+        .pdf-table tbody td { padding: 8px 7px; border-bottom: 1px solid #e2e8f0; font-size: 10px; color: #475569; }
+        .pdf-table .total-row td { padding: 12px 7px; border-top: 2px solid #0f766e; font-size: 12px; color: #0f172a; font-weight: 700; background: #f0fdfa; }
+        .pdf-table .total-row td.accent { color: #059669; font-size: 14px; text-align: right; }
+        .pdf-section { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px 16px; margin-top: 12px; }
+        .pdf-section .stitle { font-size: 9px; text-transform: uppercase; color: #64748b; font-weight: 600; letter-spacing: 0.7px; margin-bottom: 5px; }
+        .pdf-section .stext { color: #0f172a; font-size: 11px; line-height: 1.6; }
+        .pdf-footer { text-align: center; padding-top: 16px; margin-top: 20px; border-top: 1px solid #e2e8f0; font-size: 8px; color: #94a3b8; line-height: 1.6; }
+        .pdf-watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg); font-size: 70px; color: rgba(13, 148, 136, 0.035); font-weight: 900; pointer-events: none; z-index: 0; letter-spacing: 8px; overflow: hidden; }
+        .pdf-safety-badge { display: inline-block; padding: 1px 6px; border-radius: 2px; font-size: 8px; font-weight: 600; background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; margin: 1px 2px 1px 0; }
+        .pdf-terms { margin-top: 16px; padding: 10px 14px; background: #f8fafc; border-left: 3px solid #0d9488; border-radius: 0 6px 6px 0; font-size: 8px; color: #94a3b8; line-height: 1.7; }
+      `;
 
-    <div class="summary-grid">
-      <div class="summary-box"><div class="lbl">Facility</div><div class="val">${safeInstName}</div></div>
-      <div class="summary-box"><div class="lbl">Type</div><div class="val" style="text-transform:capitalize;">${safeInstType}</div></div>
-      <div class="summary-box"><div class="lbl">Area</div><div class="val">${data.area_size ? Number(data.area_size).toLocaleString() + ' sq.ft' : '-'}</div></div>
-      <div class="summary-box"><div class="lbl">Monthly Cost</div><div class="val accent">Rs ${totalCost.toLocaleString('en-IN')}</div></div>
-    </div>
+      pdfStyles = document.createElement('style');
+      pdfStyles.id = 'pdf-export-styles';
+      pdfStyles.textContent = cssText;
+      document.head.appendChild(pdfStyles);
 
-    <table>
-      <thead>
-        <tr>
-          <th class="center" style="width:30px;">#</th>
-          <th>Product Name</th>
-          <th class="center" style="width:75px;">Category</th>
-          <th class="center" style="width:55px;">Qty</th>
-          <th class="center" style="width:85px;">Dilution</th>
-          <th class="right" style="width:80px;">Unit Price</th>
-          <th class="right" style="width:85px;">Monthly Cost</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${rowsHtml || '<tr><td colspan="7" style="text-align:center;padding:24px;color:#94a3b8;font-size:12px;">No products in this quotation.</td></tr>'}
-      </tbody>
-      <tfoot>
-        <tr class="total-row">
-          <td colspan="5">Total Monthly Estimate (${items.length} product${items.length !== 1 ? 's' : ''})</td>
-          <td class="right"></td>
-          <td class="accent">Rs ${totalCost.toLocaleString('en-IN')}</td>
-        </tr>
-      </tfoot>
-    </table>
+      // ── Build just the body content (no DOCTYPE, html, head, body wrappers) ──
+      const safetyAlertsHtml = items.filter(item => item.alerts && Array.isArray(item.alerts) && item.alerts.length > 0).length > 0
+        ? items.filter(item => item.alerts && Array.isArray(item.alerts) && item.alerts.length > 0)
+            .map(item => {
+              const safeName = escapeHtml(item.product_name || 'Product');
+              const alertBadges = item.alerts.map(a => `<span class="pdf-safety-badge">${escapeHtml(a)}</span>`).join(' ');
+              return `<div style="margin-bottom:4px;padding:4px 0;border-bottom:1px solid #fecaca;">
+                <div style="font-size:10px;font-weight:600;color:#991b1b;margin-bottom:2px;">${safeName}</div>
+                <div>${alertBadges}</div>
+              </div>`;
+            }).join('')
+        : '';
 
-    ${items.some(item => item.alerts && Array.isArray(item.alerts) && item.alerts.length > 0) ? `<div class="summary-section" style="border-color:#fecaca;background:#fef2f2;">
-      <div class="section-title" style="color:#dc2626;">⚠ Safety & Handling Alerts</div>
-      ${items.filter(item => item.alerts && Array.isArray(item.alerts) && item.alerts.length > 0).map(item => {
-        const safeName = escapeHtml(item.product_name || 'Product');
-        const alertBadges = item.alerts.map(a => `<span class="safety-badge">${escapeHtml(a)}</span>`).join(' ');
-        return `<div style="margin-bottom:6px;padding:6px 0;border-bottom:1px solid #fecaca;">
-          <div style="font-size:11px;font-weight:600;color:#991b1b;margin-bottom:3px;">${safeName}</div>
-          <div>${alertBadges}</div>
-        </div>`;
-      }).join('')}
-      <div style="font-size:9px;color:#b91c1c;margin-top:6px;opacity:0.7;">Refer to product Safety Data Sheet (SDS) for complete safety information.</div>
-    </div>` : ''}
+      const bodyHtml = `
+        <div class="pdf-watermark">GANGA MAXX</div>
+        <div class="pdf-page">
+          <div class="pdf-header">
+            <div class="pdf-brand">
+              <h1>Ganga Maxx</h1>
+              <div class="tagline">AI Institutional Cleaning Product Selector</div>
+            </div>
+            <div class="pdf-doc-info">
+              <h2>Product Quotation</h2>
+              <div class="meta">Date: ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
+              <div class="meta">Ref: QTN-${safeInstName.substring(0, 4).toUpperCase()}-${Date.now().toString().slice(-6)}</div>
+            </div>
+          </div>
 
-    ${safeSummary ? `<div class="summary-section">
-      <div class="section-title">Summary</div>
-      <div class="section-text">${safeSummary}</div>
-    </div>` : ''}
+          <div class="pdf-summary-grid">
+            <div class="pdf-summary-box"><div class="lbl">Facility</div><div class="val">${safeInstName}</div></div>
+            <div class="pdf-summary-box"><div class="lbl">Type</div><div class="val" style="text-transform:capitalize;">${safeInstType}</div></div>
+            <div class="pdf-summary-box"><div class="lbl">Area</div><div class="val">${data.area_size ? Number(data.area_size).toLocaleString() + ' sq.ft' : '-'}</div></div>
+            <div class="pdf-summary-box"><div class="lbl">Monthly Cost</div><div class="val accent">Rs ${totalCost.toLocaleString('en-IN')}</div></div>
+          </div>
 
-    ${safeFinancialAlert ? `<div class="summary-section" style="border-color:#fde68a;background:#fffbeb;">
-      <div class="section-title" style="color:#d97706;">Financial Notice</div>
-      <div class="section-text" style="color:#92400e;">${safeFinancialAlert}</div>
-    </div>` : ''}
+          <table class="pdf-table">
+            <thead>
+              <tr>
+                <th class="center" style="width:28px;">#</th>
+                <th>Product Name</th>
+                <th class="center" style="width:70px;">Category</th>
+                <th class="center" style="width:50px;">Qty</th>
+                <th class="center" style="width:80px;">Dilution</th>
+                <th class="right" style="width:75px;">Unit Price</th>
+                <th class="right" style="width:80px;">Monthly Cost</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml || '<tr><td colspan="7" style="text-align:center;padding:20px;color:#94a3b8;font-size:11px;">No products in this quotation.</td></tr>'}
+            </tbody>
+            <tfoot>
+              <tr class="total-row">
+                <td colspan="5">Total Monthly Estimate (${items.length} product${items.length !== 1 ? 's' : ''})</td>
+                <td class="right"></td>
+                <td class="accent">Rs ${totalCost.toLocaleString('en-IN')}</td>
+              </tr>
+            </tfoot>
+          </table>
 
-    <div class="footer">
-      <div><strong>Ganga Maxx</strong> &mdash; AI Institutional Cleaning Product Selector</div>
-      <div>This quotation was generated by our AI engine based on your facility profile.</div>
-      <div style="margin-top:4px;">Generated on ${new Date().toLocaleString('en-IN')} &bull; Valid for 30 days</div>
-    </div>
-  </div>
-</body></html>`;
+          ${safetyAlertsHtml ? `<div class="pdf-section" style="border-color:#fecaca;background:#fef2f2;">
+            <div class="stitle" style="color:#dc2626;">⚠ Safety & Handling Alerts</div>
+            ${safetyAlertsHtml}
+            <div style="font-size:8px;color:#b91c1c;margin-top:4px;opacity:0.7;">Refer to product Safety Data Sheet (SDS) for complete safety information.</div>
+          </div>` : ''}
 
-      // Use an iframe for reliable PDF rendering.
-      // html2canvas struggles with hidden or off-screen elements in the main document,
-      // but an iframe provides a clean, isolated rendering context that works consistently.
-      const iframe = document.createElement('iframe');
-      iframe.style.position = 'fixed';
-      iframe.style.top = '0';
-      iframe.style.left = '0';
-      iframe.style.width = '794px';
-      iframe.style.height = '1123px';
-      iframe.style.border = 'none';
-      iframe.style.zIndex = '-9999';
-      iframe.style.pointerEvents = 'none';
-      iframe.style.background = '#ffffff';
-      iframe.title = 'pdf-export';
-      document.body.appendChild(iframe);
+          ${safeSummary ? `<div class="pdf-section">
+            <div class="stitle">Summary</div>
+            <div class="stext">${safeSummary}</div>
+          </div>` : ''}
 
-      // Write the HTML into the iframe
-      const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-      iframeDoc.open();
-      iframeDoc.write(html);
-      iframeDoc.close();
+          ${safeFinancialAlert ? `<div class="pdf-section" style="border-color:#fde68a;background:#fffbeb;">
+            <div class="stitle" style="color:#d97706;">Financial Notice</div>
+            <div class="stext" style="color:#92400e;">${safeFinancialAlert}</div>
+          </div>` : ''}
 
-      // Wait for iframe content to fully render (images, fonts, etc.)
-      await new Promise(resolve => setTimeout(resolve, 300));
+          <div class="pdf-terms">
+            <strong>Terms & Conditions:</strong> Prices are indicative and may vary based on order quantity, delivery location, and current market rates. All recommendations are AI-generated based on facility profile. GST and other taxes applicable as per government regulations. Valid for 30 days from the date of generation.
+          </div>
+
+          <div class="pdf-footer">
+            <div><strong>Ganga Maxx</strong> &mdash; AI Institutional Cleaning Product Selector</div>
+            <div>This quotation was generated by our AI engine based on your facility profile.</div>
+            <div style="margin-top:3px;">Generated on ${new Date().toLocaleString('en-IN')} &bull; Valid for 30 days</div>
+          </div>
+        </div>
+      `;
+
+      // ── Create a visible container in the document for html2canvas ──
+      pdfContainer = document.createElement('div');
+      pdfContainer.id = 'pdf-export-container';
+      pdfContainer.innerHTML = bodyHtml;
+      // Position off-screen but still in the DOM so html2canvas can capture it
+      pdfContainer.style.cssText = 'position:fixed;top:0;left:0;width:794px;background:#ffffff;z-index:-9999;pointer-events:none;overflow:hidden;';
+      document.body.appendChild(pdfContainer);
+
+      // Small delay to let the browser parse and apply the injected styles
+      await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 100)));
 
       const fileName = `quotation-${instName.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}.pdf`;
       const opt = {
@@ -371,18 +231,14 @@ export default function Recommendations() {
           letterRendering: true,
           backgroundColor: '#ffffff',
           width: 794,
-          height: 1123,
           logging: false,
-          windowWidth: 794,
-          windowHeight: 1123
+          windowWidth: 794
         },
-        jsPDF: { unit: 'px', format: [794, 1123], orientation: 'portrait' },
+        jsPDF: { unit: 'px', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
       };
 
-      // Render from the iframe's body (clean document context)
-      await html2pdf().set(opt).from(iframe.contentDocument.body).save();
-      document.body.removeChild(iframe);
+      await html2pdf().set(opt).from(pdfContainer).save();
       setToast({ type: 'success', message: 'PDF downloaded successfully!' });
       setTimeout(() => setToast(null), 5000);
     } catch (err) {
@@ -390,6 +246,13 @@ export default function Recommendations() {
       setToast({ type: 'error', message: 'Failed to generate PDF. Please try again.' });
       setTimeout(() => setToast(null), 5000);
     } finally {
+      // Clean up injected DOM elements
+      if (pdfContainer && pdfContainer.parentNode) {
+        pdfContainer.parentNode.removeChild(pdfContainer);
+      }
+      if (pdfStyles && pdfStyles.parentNode) {
+        pdfStyles.parentNode.removeChild(pdfStyles);
+      }
       setDownloading(false);
     }
   };

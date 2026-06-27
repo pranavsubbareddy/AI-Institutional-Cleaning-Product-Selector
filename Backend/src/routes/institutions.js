@@ -110,9 +110,16 @@ router.get('/:id', async (req, res) => {
     institution.metadata = safeJsonParse(institution.metadata, null);
     const recommendations = await queryAll('SELECT * FROM recommendations WHERE institution_id = ? ORDER BY created_at DESC', [req.params.id]);
 
+    // Parse JSON fields in recommendations for proper display
+    const parsedRecs = recommendations.map(rec => ({
+      ...rec,
+      alerts: safeJsonParse(rec.alerts, []),
+      surface_types: safeJsonParse(rec.surface_types, []),
+    }));
+
     res.json({
       success: true,
-      data: { ...institution, recommendations },
+      data: { ...institution, recommendations: parsedRecs },
       timestamp: new Date().toISOString()
     });
   } catch (error) {
