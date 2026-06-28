@@ -50,38 +50,17 @@ export default function Recommendations() {
   };
 
   const handleDownloadPDF = async () => {
-    if (!contentRef.current || downloading) return;
+    if (!data || downloading) return;
     setDownloading(true);
-    let pdfContainer = null;
     try {
-      const escapeHtml = (str) => String(str).replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
+      const escapeHtml = (str) => String(str || '').replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
       const instName = data.institution_name || 'Recommendation';
       const items = data.items || [];
-
-      const rowsHtml = items.map((item, i) => {
-        const unitPrice = item.unit_price || item.base_price || 0;
-        const monthlyCost = Number(item.monthly_cost || 0);
-        const dilution = item.dilution_ratio || '-';
-        return `<tr style="${i % 2 === 0 ? 'background-color: #ffffff;' : 'background-color: #f0fdfa;'}">
-          <td style="padding:10px 8px;border-bottom:1px solid #e2e8f0;text-align:center;font-size:11px;color:#475569;">${i + 1}</td>
-          <td style="padding:10px 8px;border-bottom:1px solid #e2e8f0;font-size:11px;color:#1e293b;font-weight:500;">${escapeHtml(item.product_name || 'Product')}</td>
-          <td style="padding:10px 8px;border-bottom:1px solid #e2e8f0;text-align:center;font-size:11px;color:#475569;">${escapeHtml(item.category || '-')}</td>
-          <td style="padding:10px 8px;border-bottom:1px solid #e2e8f0;text-align:center;font-size:11px;color:#475569;">${item.quantity_estimate || 0}</td>
-          <td style="padding:10px 8px;border-bottom:1px solid #e2e8f0;text-align:center;font-size:11px;color:#475569;">${dilution}</td>
-          <td style="padding:10px 8px;border-bottom:1px solid #e2e8f0;text-align:right;font-size:11px;color:#475569;">Rs ${Number(unitPrice).toLocaleString('en-IN')}</td>
-          <td style="padding:10px 8px;border-bottom:1px solid #e2e8f0;text-align:right;font-size:11px;color:#059669;font-weight:600;">Rs ${monthlyCost.toLocaleString('en-IN')}</td>
-        </tr>`;
-      }).join('');
 
       const computedTotal = items.reduce((s, it) => s + Number(it.monthly_cost || 0), 0);
       const totalCost = computedTotal > 0 ? computedTotal : (data.total_estimated_cost || 0);
 
-      const safeInstName = escapeHtml(instName);
-      const safeSummary = data.summary ? escapeHtml(data.summary) : null;
-      const safeFinancialAlert = data.financialStatusAlert ? escapeHtml(data.financialStatusAlert) : null;
-      const safeInstType = escapeHtml((data.institution_type || '').replace(/_/g, ' '));
-
-      // ── Label maps for facility profile fields ──
+      // ── Label maps ──
       const surfaceLabelsPdf = {
         hard_floor: 'Hard Floor', carpet: 'Carpet', glass: 'Glass / Windows',
         tile: 'Tile', stainless_steel: 'Stainless Steel', wood: 'Wood',
@@ -98,167 +77,178 @@ export default function Recommendations() {
         carpet_extractor: 'Carpet Extractor', microfiber: 'Microfiber Cloths',
         auto_dispenser: 'Auto Dispenser'
       };
-      const freqLabelsPdf = {
-        daily: 'Daily', twice_daily: 'Twice Daily', weekly: 'Weekly',
-        multiple_weekly: 'Multiple/Week', custom: 'As Needed'
-      };
+      const freqLabelsPdf = { daily: 'Daily', twice_daily: 'Twice Daily', weekly: 'Weekly', multiple_weekly: 'Multiple/Week', custom: 'As Needed' };
       const hoursMapPdf = { day: 'Day (6AM-6PM)', night: 'Night (6PM-6AM)', '24x7': '24x7 Operation', business: 'Business Hours (9-5)' };
       const ageMapPdf = { new: 'New (0-5 yrs)', moderate: 'Moderate (5-15 yrs)', old: 'Old (15-30 yrs)', vintage: 'Vintage (30+ yrs)' };
 
       const metadata = data.metadata || {};
-      const surfaceTypesArr = Array.isArray(data.surface_types)
-        ? data.surface_types
-        : (typeof data.surface_types === 'string' ? JSON.parse(data.surface_types) : []);
+      let surfaceTypesArr = [];
+      try {
+        surfaceTypesArr = Array.isArray(data.surface_types) ? data.surface_types
+          : (typeof data.surface_types === 'string' ? JSON.parse(data.surface_types) : []);
+      } catch (_) { surfaceTypesArr = []; }
+
       const surfaceTypesStr = surfaceTypesArr.map(s => surfaceLabelsPdf[s] || s).join(', ') || 'N/A';
-      const equipmentStr = (metadata.equipment || []).map(e => equipLabelsPdf[e] || e).join(', ') || 'None';
-      const preferencesStr = (metadata.preferences || []).map(p => prefLabelsPdf[p] || p).join(', ') || 'None';
-      const freqStr = freqLabelsPdf[metadata.cleaning_frequency] || metadata.cleaning_frequency || 'N/A';
-      const hygieneStr = (data.hygiene_standard || '').replace(/_/g, ' ') || 'N/A';
-      const budgetStr = data.budget || data.budget_level || 'N/A';
-      const areaSizeStr = data.area_size ? Number(data.area_size).toLocaleString() : 'N/A';
-      const opHoursStr = hoursMapPdf[metadata.operating_hours] || metadata.operating_hours || 'N/A';
-      const ageStr = ageMapPdf[metadata.facility_age] || metadata.facility_age || 'N/A';
+      const equipmentStr   = (metadata.equipment   || []).map(e => equipLabelsPdf[e] || e).join(', ') || 'None';
+      const preferencesStr = (metadata.preferences || []).map(p => prefLabelsPdf[p]  || p).join(', ') || 'None';
+      const freqStr        = freqLabelsPdf[metadata.cleaning_frequency] || metadata.cleaning_frequency || 'N/A';
+      const hygieneStr     = (data.hygiene_standard || '').replace(/_/g, ' ') || 'N/A';
+      const budgetStr      = data.budget || data.budget_level || 'N/A';
+      const areaSizeStr    = data.area_size ? Number(data.area_size).toLocaleString() : 'N/A';
+      const opHoursStr     = hoursMapPdf[metadata.operating_hours] || metadata.operating_hours || 'N/A';
+      const ageStr         = ageMapPdf[metadata.facility_age]      || metadata.facility_age    || 'N/A';
 
-      // ── Product table (reusing rowsHtml from above) ──
-      const productTableHtml = `
-        <table style="width:100%;border-collapse:collapse;margin-top:12px;font-family:Arial,sans-serif;">
-          <thead>
-            <tr style="background:#0f766e;color:white;">
-              <th style="padding:8px 6px;text-align:center;font-size:10px;font-weight:600;width:24px;">#</th>
-              <th style="padding:8px 6px;text-align:left;font-size:10px;font-weight:600;">Product</th>
-              <th style="padding:8px 6px;text-align:center;font-size:10px;font-weight:600;width:55px;">Category</th>
-              <th style="padding:8px 6px;text-align:center;font-size:10px;font-weight:600;width:38px;">Qty</th>
-              <th style="padding:8px 6px;text-align:center;font-size:10px;font-weight:600;width:65px;">Dilution</th>
-              <th style="padding:8px 6px;text-align:right;font-size:10px;font-weight:600;width:65px;">Unit Price</th>
-              <th style="padding:8px 6px;text-align:right;font-size:10px;font-weight:600;width:70px;">Monthly</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rowsHtml || '<tr><td colspan="7" style="text-align:center;padding:20px;color:#94a3b8;font-size:11px;">No products in this quotation.</td></tr>'}
-          </tbody>
-          <tfoot>
-            <tr style="background:#f0fdfa;">
-              <td colspan="4" style="padding:10px 8px;border-top:2px solid #0f766e;font-size:12px;font-weight:700;color:#0f172a;">Total Monthly Estimate (${items.length} product${items.length !== 1 ? 's' : ''})</td>
-              <td style="padding:10px 8px;border-top:2px solid #0f766e;"></td>
-              <td style="padding:10px 8px;border-top:2px solid #0f766e;"></td>
-              <td style="padding:10px 8px;border-top:2px solid #0f766e;text-align:right;font-size:14px;font-weight:700;color:#059669;">Rs ${totalCost.toLocaleString('en-IN')}</td>
-            </tr>
-          </tfoot>
-        </table>
-      `;
+      // ── Product table rows ──
+      const rowsHtml = items.map((item, i) => {
+        const unitPrice   = item.unit_price || item.base_price || 0;
+        const monthlyCost = Number(item.monthly_cost || 0);
+        return `<tr style="background:${i % 2 === 0 ? '#ffffff' : '#f0fdfa'};">
+          <td style="padding:9px 7px;border-bottom:1px solid #e2e8f0;text-align:center;font-size:11px;color:#475569;">${i + 1}</td>
+          <td style="padding:9px 7px;border-bottom:1px solid #e2e8f0;font-size:11px;color:#1e293b;font-weight:600;">${escapeHtml(item.product_name || 'Product')}</td>
+          <td style="padding:9px 7px;border-bottom:1px solid #e2e8f0;text-align:center;font-size:10px;color:#475569;">${escapeHtml(item.category || '-')}</td>
+          <td style="padding:9px 7px;border-bottom:1px solid #e2e8f0;text-align:center;font-size:11px;color:#475569;">${item.quantity_estimate || 0} ${escapeHtml(item.unit || 'L')}</td>
+          <td style="padding:9px 7px;border-bottom:1px solid #e2e8f0;text-align:center;font-size:10px;color:#475569;">${escapeHtml(item.dilution_ratio || '-')}</td>
+          <td style="padding:9px 7px;border-bottom:1px solid #e2e8f0;text-align:right;font-size:11px;color:#475569;">Rs ${Number(unitPrice).toLocaleString('en-IN')}</td>
+          <td style="padding:9px 7px;border-bottom:1px solid #e2e8f0;text-align:right;font-size:11px;color:#059669;font-weight:700;">Rs ${monthlyCost.toLocaleString('en-IN')}</td>
+        </tr>`;
+      }).join('');
 
-      // ── Build email-template-matching HTML (all inline styles) ──
-      const bodyHtml = `
-        <div style="font-family:Arial,sans-serif;max-width:794px;margin:0 auto;padding:20px;color:#334155;">
-          <!-- HEADER -->
-          <div style="background:#0f766e;color:white;padding:24px;border-radius:8px 8px 0 0;">
-            <h1 style="margin:0;font-size:24px;font-weight:800;">Ganga Maxx</h1>
-            <p style="margin:6px 0 0;opacity:0.85;font-size:14px;">Cleaning Product Recommendations</p>
-          </div>
+      // ── Safety alerts HTML ──
+      const alertItems = items.filter(it => it.alerts && Array.isArray(it.alerts) && it.alerts.length > 0);
+      const alertsHtml = alertItems.length > 0 ? `
+        <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:12px;margin-top:16px;">
+          <p style="font-size:13px;font-weight:600;color:#b91c1c;margin:0 0 8px;">&#9888; Safety &amp; Handling Alerts</p>
+          ${alertItems.map(item => `
+            <div style="margin-bottom:6px;padding:4px 0;border-bottom:1px solid #fecaca;">
+              <div style="font-size:11px;font-weight:600;color:#991b1b;margin-bottom:3px;">${escapeHtml(item.product_name)}</div>
+              <div>${item.alerts.map(a => `<span style="display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:600;background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;margin:1px 3px 1px 0;">${escapeHtml(a)}</span>`).join('')}</div>
+            </div>`).join('')}
+          <div style="font-size:9px;color:#b91c1c;margin-top:6px;opacity:0.8;">Refer to product Safety Data Sheet (SDS) for complete safety information.</div>
+        </div>` : '';
 
-          <!-- CONTENT -->
-          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-top:0;padding:24px;border-radius:0 0 8px 8px;">
+      // ── Complete self-contained HTML page ──
+      const fullPageHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:Arial,Helvetica,sans-serif;background:#ffffff;color:#334155;}
+  table{border-collapse:collapse;width:100%;}
+</style>
+</head>
+<body style="background:#ffffff;">
+<div style="max-width:780px;margin:0 auto;padding:16px;background:#ffffff;">
 
-            <!-- Contact Information -->
-            <h2 style="font-size:16px;color:#0f172a;border-bottom:2px solid #0d9488;padding-bottom:8px;margin:0 0 14px 0;font-weight:700;">Contact Information</h2>
-            <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
-              <tr><td style="padding:6px 8px;color:#64748b;font-size:13px;">Name</td><td style="padding:6px 8px;font-weight:500;color:#1e293b;font-size:13px;">${escapeHtml(data.institution_name || 'N/A')}</td></tr>
-              <tr><td style="padding:6px 8px;color:#64748b;font-size:13px;">Email</td><td style="padding:6px 8px;font-weight:500;color:#1e293b;font-size:13px;">${escapeHtml(data.contact_email || 'N/A')}</td></tr>
-              <tr><td style="padding:6px 8px;color:#64748b;font-size:13px;">Phone</td><td style="padding:6px 8px;font-weight:500;color:#1e293b;font-size:13px;">${escapeHtml(data.contact_phone || 'N/A')}</td></tr>
-              <tr><td style="padding:6px 8px;color:#64748b;font-size:13px;">Facility</td><td style="padding:6px 8px;font-weight:500;color:#1e293b;font-size:13px;">${escapeHtml(data.institution_name || 'N/A')}</td></tr>
-              <tr><td style="padding:6px 8px;color:#64748b;font-size:13px;">Address</td><td style="padding:6px 8px;font-weight:500;color:#1e293b;font-size:13px;">${escapeHtml(data.address || 'N/A')}</td></tr>
-            </table>
+  <!-- HEADER -->
+  <div style="background:#0f766e;color:#ffffff;padding:22px 24px;border-radius:8px 8px 0 0;">
+    <div style="font-size:22px;font-weight:800;letter-spacing:-0.5px;">Ganga Maxx</div>
+    <div style="font-size:13px;opacity:0.85;margin-top:4px;">AI Institutional Cleaning Product Selector</div>
+    <div style="font-size:11px;opacity:0.7;margin-top:2px;">Quotation / Product Recommendation Report</div>
+  </div>
 
-            <!-- Facility Profile -->
-            <h2 style="font-size:16px;color:#0f172a;border-bottom:2px solid #0d9488;padding-bottom:8px;margin:18px 0 14px 0;font-weight:700;">Facility Profile</h2>
-            <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
-              <tr><td style="padding:6px 8px;color:#64748b;font-size:13px;">Type</td><td style="padding:6px 8px;font-weight:500;color:#1e293b;font-size:13px;text-transform:capitalize;">${escapeHtml((data.institution_type || '').replace(/_/g, ' ') || 'N/A')}</td></tr>
-              <tr><td style="padding:6px 8px;color:#64748b;font-size:13px;">Area</td><td style="padding:6px 8px;font-weight:500;color:#1e293b;font-size:13px;">${areaSizeStr} sq. ft.</td></tr>
-              <tr><td style="padding:6px 8px;color:#64748b;font-size:13px;">Budget</td><td style="padding:6px 8px;font-weight:500;color:#1e293b;font-size:13px;text-transform:capitalize;">${escapeHtml(budgetStr)}</td></tr>
-              <tr><td style="padding:6px 8px;color:#64748b;font-size:13px;">Surfaces</td><td style="padding:6px 8px;font-weight:500;color:#1e293b;font-size:13px;">${escapeHtml(surfaceTypesStr)}</td></tr>
-              <tr><td style="padding:6px 8px;color:#64748b;font-size:13px;">Hygiene</td><td style="padding:6px 8px;font-weight:500;color:#1e293b;font-size:13px;text-transform:capitalize;">${escapeHtml(hygieneStr)}</td></tr>
-              <tr><td style="padding:6px 8px;color:#64748b;font-size:13px;">Frequency</td><td style="padding:6px 8px;font-weight:500;color:#1e293b;font-size:13px;">${escapeHtml(freqStr)}</td></tr>
-              <tr><td style="padding:6px 8px;color:#64748b;font-size:13px;">Equipment</td><td style="padding:6px 8px;font-weight:500;color:#1e293b;font-size:13px;">${escapeHtml(equipmentStr)}</td></tr>
-              <tr><td style="padding:6px 8px;color:#64748b;font-size:13px;">Preferences</td><td style="padding:6px 8px;font-weight:500;color:#1e293b;font-size:13px;">${escapeHtml(preferencesStr)}</td></tr>
-              ${metadata.floors ? `<tr><td style="padding:6px 8px;color:#64748b;font-size:13px;">Floors</td><td style="padding:6px 8px;font-weight:500;color:#1e293b;font-size:13px;">${escapeHtml(String(metadata.floors))}</td></tr>` : ''}
-              ${metadata.occupants ? `<tr><td style="padding:6px 8px;color:#64748b;font-size:13px;">Occupants</td><td style="padding:6px 8px;font-weight:500;color:#1e293b;font-size:13px;">${escapeHtml(String(metadata.occupants))}+</td></tr>` : ''}
-              ${opHoursStr !== 'N/A' ? `<tr><td style="padding:6px 8px;color:#64748b;font-size:13px;">Operating Hours</td><td style="padding:6px 8px;font-weight:500;color:#1e293b;font-size:13px;">${escapeHtml(opHoursStr)}</td></tr>` : ''}
-              ${ageStr !== 'N/A' ? `<tr><td style="padding:6px 8px;color:#64748b;font-size:13px;">Facility Age</td><td style="padding:6px 8px;font-weight:500;color:#1e293b;font-size:13px;">${escapeHtml(ageStr)}</td></tr>` : ''}
-            </table>
+  <!-- BODY -->
+  <div style="background:#f8fafc;border:1px solid #e2e8f0;border-top:none;padding:24px;border-radius:0 0 8px 8px;">
 
-            <!-- Recommendations / Summary -->
-            <h2 style="font-size:16px;color:#0f172a;border-bottom:2px solid #0d9488;padding-bottom:8px;margin:18px 0 14px 0;font-weight:700;">Recommendations</h2>
+    <!-- Meta row -->
+    <div style="display:flex;justify-content:space-between;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid #e2e8f0;">
+      <div>
+        <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;">Institution</div>
+        <div style="font-size:16px;font-weight:700;color:#0f172a;margin-top:2px;">${escapeHtml(instName)}</div>
+        <div style="font-size:12px;color:#475569;text-transform:capitalize;margin-top:1px;">${escapeHtml((data.institution_type || '').replace(/_/g, ' '))}</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;">Generated</div>
+        <div style="font-size:12px;color:#475569;margin-top:2px;">${new Date().toLocaleString('en-IN')}</div>
+      </div>
+    </div>
 
-            ${safeSummary ? `<p style="font-size:13px;color:#475569;line-height:1.5;margin:0 0 12px;">${safeSummary}</p>` : ''}
+    <!-- SECTION: Contact Information -->
+    <div style="margin-bottom:20px;">
+      <div style="font-size:14px;font-weight:700;color:#0f172a;border-left:3px solid #0d9488;padding-left:10px;margin-bottom:10px;">Contact Information</div>
+      <table>
+        <tr><td style="padding:5px 8px;color:#64748b;font-size:12px;width:130px;">Name</td><td style="padding:5px 8px;font-weight:500;color:#1e293b;font-size:12px;">${escapeHtml(data.institution_name || 'N/A')}</td></tr>
+        <tr style="background:#f1f5f9;"><td style="padding:5px 8px;color:#64748b;font-size:12px;">Email</td><td style="padding:5px 8px;font-weight:500;color:#1e293b;font-size:12px;">${escapeHtml(data.contact_email || 'N/A')}</td></tr>
+        <tr><td style="padding:5px 8px;color:#64748b;font-size:12px;">Phone</td><td style="padding:5px 8px;font-weight:500;color:#1e293b;font-size:12px;">${escapeHtml(data.contact_phone || 'N/A')}</td></tr>
+        <tr style="background:#f1f5f9;"><td style="padding:5px 8px;color:#64748b;font-size:12px;">Address</td><td style="padding:5px 8px;font-weight:500;color:#1e293b;font-size:12px;">${escapeHtml(data.address || 'N/A')}</td></tr>
+      </table>
+    </div>
 
-            <!-- Product Table -->
-            ${productTableHtml}
+    <!-- SECTION: Facility Profile -->
+    <div style="margin-bottom:20px;">
+      <div style="font-size:14px;font-weight:700;color:#0f172a;border-left:3px solid #0d9488;padding-left:10px;margin-bottom:10px;">Facility Profile</div>
+      <table>
+        <tr><td style="padding:5px 8px;color:#64748b;font-size:12px;width:130px;">Type</td><td style="padding:5px 8px;font-weight:500;color:#1e293b;font-size:12px;text-transform:capitalize;">${escapeHtml((data.institution_type || '').replace(/_/g, ' ') || 'N/A')}</td></tr>
+        <tr style="background:#f1f5f9;"><td style="padding:5px 8px;color:#64748b;font-size:12px;">Area Size</td><td style="padding:5px 8px;font-weight:500;color:#1e293b;font-size:12px;">${areaSizeStr} sq. ft.</td></tr>
+        <tr><td style="padding:5px 8px;color:#64748b;font-size:12px;">Budget Level</td><td style="padding:5px 8px;font-weight:500;color:#1e293b;font-size:12px;text-transform:capitalize;">${escapeHtml(budgetStr)}</td></tr>
+        <tr style="background:#f1f5f9;"><td style="padding:5px 8px;color:#64748b;font-size:12px;">Hygiene Standard</td><td style="padding:5px 8px;font-weight:500;color:#1e293b;font-size:12px;text-transform:capitalize;">${escapeHtml(hygieneStr)}</td></tr>
+        <tr><td style="padding:5px 8px;color:#64748b;font-size:12px;">Surface Types</td><td style="padding:5px 8px;font-weight:500;color:#1e293b;font-size:12px;">${escapeHtml(surfaceTypesStr)}</td></tr>
+        <tr style="background:#f1f5f9;"><td style="padding:5px 8px;color:#64748b;font-size:12px;">Cleaning Frequency</td><td style="padding:5px 8px;font-weight:500;color:#1e293b;font-size:12px;">${escapeHtml(freqStr)}</td></tr>
+        <tr><td style="padding:5px 8px;color:#64748b;font-size:12px;">Equipment</td><td style="padding:5px 8px;font-weight:500;color:#1e293b;font-size:12px;">${escapeHtml(equipmentStr)}</td></tr>
+        <tr style="background:#f1f5f9;"><td style="padding:5px 8px;color:#64748b;font-size:12px;">Preferences</td><td style="padding:5px 8px;font-weight:500;color:#1e293b;font-size:12px;">${escapeHtml(preferencesStr)}</td></tr>
+        ${metadata.floors ? `<tr><td style="padding:5px 8px;color:#64748b;font-size:12px;">Floors</td><td style="padding:5px 8px;font-weight:500;color:#1e293b;font-size:12px;">${escapeHtml(String(metadata.floors))}</td></tr>` : ''}
+        ${metadata.occupants ? `<tr style="background:#f1f5f9;"><td style="padding:5px 8px;color:#64748b;font-size:12px;">Occupants</td><td style="padding:5px 8px;font-weight:500;color:#1e293b;font-size:12px;">${escapeHtml(String(metadata.occupants))}+</td></tr>` : ''}
+        ${opHoursStr !== 'N/A' ? `<tr><td style="padding:5px 8px;color:#64748b;font-size:12px;">Operating Hours</td><td style="padding:5px 8px;font-weight:500;color:#1e293b;font-size:12px;">${escapeHtml(opHoursStr)}</td></tr>` : ''}
+        ${ageStr !== 'N/A' ? `<tr style="background:#f1f5f9;"><td style="padding:5px 8px;color:#64748b;font-size:12px;">Facility Age</td><td style="padding:5px 8px;font-weight:500;color:#1e293b;font-size:12px;">${escapeHtml(ageStr)}</td></tr>` : ''}
+      </table>
+    </div>
 
-            <p style="font-size:14px;font-weight:bold;color:#059669;margin:14px 0 4px;">Rs ${totalCost.toLocaleString('en-IN')}/month</p>
-            <p style="font-size:12px;color:#64748b;margin:0 0 16px;">${items.length} product(s) recommended</p>
+    <!-- SECTION: Product Recommendations -->
+    <div style="margin-bottom:20px;">
+      <div style="font-size:14px;font-weight:700;color:#0f172a;border-left:3px solid #0d9488;padding-left:10px;margin-bottom:10px;">Product Recommendations</div>
+      ${data.summary ? `<p style="font-size:12px;color:#475569;line-height:1.6;margin-bottom:12px;padding:10px;background:#f0fdfa;border-radius:4px;border-left:3px solid #0d9488;">${escapeHtml(data.summary)}</p>` : ''}
 
-            <!-- Safety Alerts -->
-            ${items.filter(item => item.alerts && Array.isArray(item.alerts) && item.alerts.length > 0).length > 0 ? `
-            <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:12px;margin-top:12px;">
-              <p style="font-size:13px;font-weight:600;color:#b91c1c;margin:0 0 6px;">⚠ Safety &amp; Handling Alerts</p>
-              ${items.filter(item => item.alerts && Array.isArray(item.alerts) && item.alerts.length > 0).map(item => {
-                const sn = escapeHtml(item.product_name || 'Product');
-                const badges = item.alerts.map(a => `<span style="display:inline-block;padding:1px 6px;border-radius:2px;font-size:9px;font-weight:600;background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;margin:1px 2px 1px 0;">${escapeHtml(a)}</span>`).join(' ');
-                return `<div style="margin-bottom:4px;padding:4px 0;border-bottom:1px solid #fecaca;">
-                  <div style="font-size:11px;font-weight:600;color:#991b1b;margin-bottom:2px;">${sn}</div>
-                  <div>${badges}</div>
-                </div>`;
-              }).join('')}
-              <div style="font-size:9px;color:#b91c1c;margin-top:4px;opacity:0.7;">Refer to product Safety Data Sheet (SDS) for complete safety information.</div>
-            </div>` : ''}
+      <table style="border-collapse:collapse;width:100%;">
+        <thead>
+          <tr style="background:#0f766e;color:#ffffff;">
+            <th style="padding:9px 7px;text-align:center;font-size:10px;font-weight:600;width:28px;">#</th>
+            <th style="padding:9px 7px;text-align:left;font-size:10px;font-weight:600;">Product Name</th>
+            <th style="padding:9px 7px;text-align:center;font-size:10px;font-weight:600;width:60px;">Category</th>
+            <th style="padding:9px 7px;text-align:center;font-size:10px;font-weight:600;width:70px;">Qty/Month</th>
+            <th style="padding:9px 7px;text-align:center;font-size:10px;font-weight:600;width:70px;">Dilution</th>
+            <th style="padding:9px 7px;text-align:right;font-size:10px;font-weight:600;width:70px;">Unit Price</th>
+            <th style="padding:9px 7px;text-align:right;font-size:10px;font-weight:600;width:75px;">Monthly Cost</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml || '<tr><td colspan="7" style="text-align:center;padding:20px;color:#94a3b8;font-size:12px;">No products in this quotation.</td></tr>'}
+        </tbody>
+        <tfoot>
+          <tr style="background:#ecfdf5;">
+            <td colspan="4" style="padding:11px 8px;border-top:2px solid #0f766e;font-size:12px;font-weight:700;color:#0f172a;">Total Monthly Estimate &mdash; ${items.length} product${items.length !== 1 ? 's' : ''}</td>
+            <td colspan="2" style="padding:11px 8px;border-top:2px solid #0f766e;"></td>
+            <td style="padding:11px 8px;border-top:2px solid #0f766e;text-align:right;font-size:15px;font-weight:700;color:#059669;">Rs ${totalCost.toLocaleString('en-IN')}</td>
+          </tr>
+        </tfoot>
+      </table>
 
-            <!-- Financial Alert -->
-            ${safeFinancialAlert ? `
-            <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:12px;margin-top:12px;">
-              <p style="font-size:13px;font-weight:600;color:#d97706;margin:0 0 4px;">Financial Notice</p>
-              <p style="font-size:11px;color:#92400e;line-height:1.5;margin:0;">${safeFinancialAlert}</p>
-            </div>` : ''}
+      ${alertsHtml}
 
-            <!-- Footer -->
-            <div style="text-align:center;padding-top:20px;margin-top:24px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;line-height:1.6;">
-              <p style="margin:0;">Generated by <strong>Ganga Maxx</strong> &mdash; AI Institutional Cleaning Product Selector</p>
-              <p style="margin:4px 0 0;">${new Date().toLocaleString('en-IN')}</p>
-            </div>
-          </div>
-        </div>
-      `;
+      ${data.financialStatusAlert ? `
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:12px;margin-top:14px;">
+        <p style="font-size:12px;font-weight:600;color:#d97706;margin:0 0 4px;">&#9432; Financial Notice</p>
+        <p style="font-size:11px;color:#92400e;line-height:1.5;margin:0;">${escapeHtml(data.financialStatusAlert)}</p>
+      </div>` : ''}
+    </div>
+
+    <!-- FOOTER -->
+    <div style="text-align:center;padding-top:18px;margin-top:8px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;line-height:1.7;">
+      <div>Generated by <strong style="color:#0f766e;">Ganga Maxx</strong> &mdash; AI Institutional Cleaning Product Selector</div>
+      <div style="margin-top:2px;">${new Date().toLocaleString('en-IN')}</div>
+      <div style="margin-top:2px;font-size:10px;">This is a computer-generated document. No signature required.</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>`;
 
       const fileName = `quotation-${instName.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}.pdf`;
 
       const { default: html2pdf } = await import('html2pdf.js');
 
-      // Wrap the body HTML in a full page with explicit white background
-      const fullHtml = `<div style="font-family:Arial,sans-serif;background:#ffffff;padding:0;margin:0;width:794px;">${bodyHtml}</div>`;
-
-      // Create an off-screen container that html2canvas can properly render
-      // CRITICAL: must NOT use z-index:-1 or opacity:0 — those break html2canvas capture
-      pdfContainer = document.createElement('div');
-      pdfContainer.id = 'pdf-export-container';
-      pdfContainer.style.cssText = [
-        'position:absolute',
-        'left:-9999px',
-        'top:0',
-        'width:794px',
-        'background:#ffffff',
-        'color:#334155',
-        'z-index:9999',
-        'pointer-events:none',
-        'overflow:visible'
-      ].join(';');
-      pdfContainer.innerHTML = fullHtml;
-      document.body.appendChild(pdfContainer);
-
-      // Wait for fonts and layout to fully render before capture
-      await new Promise(resolve => setTimeout(resolve, 600));
-
       await html2pdf()
         .set({
-          margin: [10, 8, 10, 8],
+          margin: [8, 6, 8, 6],
           filename: fileName,
           image: { type: 'jpeg', quality: 0.98 },
           html2canvas: {
@@ -268,15 +258,13 @@ export default function Recommendations() {
             letterRendering: true,
             backgroundColor: '#ffffff',
             logging: false,
-            windowWidth: 794,
-            scrollX: 0,
-            scrollY: 0
           },
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
           pagebreak: { mode: ['css', 'legacy'] }
         })
-        .from(pdfContainer)
+        .from(fullPageHtml, 'string')
         .save();
+
       setToast({ type: 'success', message: 'PDF downloaded successfully!' });
       setTimeout(() => setToast(null), 5000);
     } catch (err) {
@@ -284,11 +272,6 @@ export default function Recommendations() {
       setToast({ type: 'error', message: 'Failed to generate PDF. Please try again.' });
       setTimeout(() => setToast(null), 5000);
     } finally {
-      // Clean up injected DOM elements
-      if (pdfContainer && pdfContainer.parentNode) {
-        pdfContainer.parentNode.removeChild(pdfContainer);
-      }
-
       setDownloading(false);
     }
   };
