@@ -228,33 +228,52 @@ export default function Recommendations() {
         </div>
       `;
 
-      // ── Create a hidden container below the viewport for html2canvas capture ──
-      // Positioned at top:100vh (below viewport) so it never appears on screen
-      pdfContainer = document.createElement('div');
-      pdfContainer.id = 'pdf-export-container';
-      pdfContainer.innerHTML = bodyHtml;
-      pdfContainer.style.cssText = 'position:fixed;top:100vh;left:0;width:794px;background:#ffffff;opacity:1;pointer-events:none;z-index:-1;';
-      document.body.appendChild(pdfContainer);
-
-      // Small delay to let the browser render the content
-      await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 300)));
-
       const fileName = `quotation-${instName.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}.pdf`;
 
       const { default: html2pdf } = await import('html2pdf.js');
+
+      // Wrap the body HTML in a full page with explicit white background
+      const fullHtml = `<div style="font-family:Arial,sans-serif;background:#ffffff;padding:0;margin:0;width:794px;">${bodyHtml}</div>`;
+
+      // Create an off-screen container that html2canvas can properly render
+      // CRITICAL: must NOT use z-index:-1 or opacity:0 — those break html2canvas capture
+      pdfContainer = document.createElement('div');
+      pdfContainer.id = 'pdf-export-container';
+      pdfContainer.style.cssText = [
+        'position:absolute',
+        'left:-9999px',
+        'top:0',
+        'width:794px',
+        'background:#ffffff',
+        'color:#334155',
+        'z-index:9999',
+        'pointer-events:none',
+        'overflow:visible'
+      ].join(';');
+      pdfContainer.innerHTML = fullHtml;
+      document.body.appendChild(pdfContainer);
+
+      // Wait for fonts and layout to fully render before capture
+      await new Promise(resolve => setTimeout(resolve, 600));
+
       await html2pdf()
         .set({
-          margin: [8, 6, 8, 6],
+          margin: [10, 8, 10, 8],
           filename: fileName,
-          image: { type: 'jpeg', quality: 0.95 },
+          image: { type: 'jpeg', quality: 0.98 },
           html2canvas: {
             scale: 2,
             useCORS: true,
+            allowTaint: true,
             letterRendering: true,
-            backgroundColor: '#ffffff'
+            backgroundColor: '#ffffff',
+            logging: false,
+            windowWidth: 794,
+            scrollX: 0,
+            scrollY: 0
           },
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-          pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+          pagebreak: { mode: ['css', 'legacy'] }
         })
         .from(pdfContainer)
         .save();
