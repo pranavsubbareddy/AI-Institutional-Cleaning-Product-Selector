@@ -222,9 +222,11 @@ export default function OrdersPage() {
       `<div class="footer">Ganga Maxx AI Institutional Cleaning Products &middot; ${inv.invoiceNumber}</div></body></html>`;
     const container = document.createElement('div');
     container.innerHTML = html;
-    // Place on-screen with near-zero opacity — html2canvas cannot capture off-screen elements reliably
-    container.style.cssText = 'position:fixed;top:0;left:0;width:794px;background:#ffffff;z-index:2147483647;opacity:0.01;pointer-events:none;';
+    // Positioned below viewport so it never appears on screen
+    container.style.cssText = 'position:fixed;top:100vh;left:0;width:794px;background:#ffffff;opacity:1;pointer-events:none;z-index:-1;';
     document.body.appendChild(container);
+    // Small delay to let the browser render the content
+    await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 300)));
     try {
       const mod = await import('html2pdf.js');
       await mod.default().set({

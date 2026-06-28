@@ -302,9 +302,12 @@ export default function AdminDashboard() {
 
       const container = document.createElement('div');
       container.innerHTML = reportHTML;
-      // Place on-screen with near-zero opacity — html2canvas cannot capture off-screen elements reliably
-      container.style.cssText = 'position:fixed;top:0;left:0;width:794px;background:#ffffff;z-index:2147483647;opacity:0.01;pointer-events:none;';
+      // Positioned below viewport so it never appears on screen
+      container.style.cssText = 'position:fixed;top:100vh;left:0;width:794px;background:#ffffff;opacity:1;pointer-events:none;z-index:-1;';
       document.body.appendChild(container);
+
+      // Small delay to let the browser render the content
+      await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 300)));
 
       const { default: html2pdf } = await import('html2pdf.js');
       await html2pdf()
@@ -312,7 +315,7 @@ export default function AdminDashboard() {
           margin: [10, 8, 10, 8],
           filename: 'GangaMaxx-System-Report-' + new Date().toISOString().slice(0, 10) + '.pdf',
           image: { type: 'jpeg', quality: 0.95 },
-          html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+          html2canvas: { scale: 2, useCORS: true, letterRendering: true, backgroundColor: '#ffffff' },
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
           pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
         })

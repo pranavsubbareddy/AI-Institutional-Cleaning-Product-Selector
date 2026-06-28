@@ -228,12 +228,12 @@ export default function Recommendations() {
         </div>
       `;
 
-      // ── Create a visible container in the document for html2canvas ──
+      // ── Create a hidden container below the viewport for html2canvas capture ──
+      // Positioned at top:100vh (below viewport) so it never appears on screen
       pdfContainer = document.createElement('div');
       pdfContainer.id = 'pdf-export-container';
       pdfContainer.innerHTML = bodyHtml;
-      // Place on-screen with full opacity — html2canvas cannot capture off-screen or transparent elements reliably
-      pdfContainer.style.cssText = 'position:fixed;top:0;left:0;width:794px;background:#ffffff;z-index:2147483647;opacity:1;pointer-events:none;';
+      pdfContainer.style.cssText = 'position:fixed;top:100vh;left:0;width:794px;background:#ffffff;opacity:1;pointer-events:none;z-index:-1;';
       document.body.appendChild(pdfContainer);
 
       // Small delay to let the browser render the content
@@ -626,14 +626,57 @@ export default function Recommendations() {
       </div>
 
       {/* Summary Table */}
-      <div className="card p-6">
+      <div className="card p-4 sm:p-6">
         <h3 className="font-semibold text-surface-100 mb-4 flex items-center gap-2">
           <svg className="w-5 h-5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
           </svg>
           Monthly Estimate Summary
         </h3>
-        <div className="overflow-x-auto">
+
+        {/* ── Mobile Card View (visible below sm) ── */}
+        <div className="block sm:hidden space-y-3 mb-4">
+          {data.items?.map((item, i) => {
+            const needsWater = item.dilution_ratio && 
+              !item.dilution_ratio.toLowerCase().includes('ready to use') && 
+              !item.dilution_ratio.toLowerCase().includes('no water');
+            return (
+              <div key={item.id || i} className="bg-surface-700/30 rounded-xl p-4 border border-surface-600/50 space-y-2">
+                <div className="flex justify-between items-start">
+                  <span className="font-medium text-surface-200 text-sm leading-tight flex-1 mr-2">{item.product_name}</span>
+                  <span className="text-xs font-semibold text-emerald-400 whitespace-nowrap">Rs {Number(item.monthly_cost || 0).toLocaleString('en-IN')}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                  <div>
+                    <span className="text-surface-500">Qty/Month</span>
+                    <p className="text-surface-300 font-medium">{item.quantity_estimate} {item.unit || 'units'}</p>
+                  </div>
+                  <div>
+                    <span className="text-surface-500">Unit Price</span>
+                    <p className="text-surface-300 font-medium">Rs {item.unit_price || item.base_price || 0}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-surface-500">Dilution</span>
+                    <p className={`font-mono mt-0.5 ${needsWater ? 'text-blue-400' : 'text-surface-400'}`}>
+                      {needsWater ? '💧 ' : '✓ '}{item.dilution_ratio || '-'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {/* Mobile total */}
+          <div className="bg-surface-700/50 rounded-xl p-4 border border-emerald-500/20">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-semibold text-surface-200">Total Monthly Estimate</span>
+              <span className="text-lg font-bold text-emerald-400">{formatCurrency(data.items?.reduce((sum, item) => sum + Number(item.monthly_cost || 0), 0) || data.total_estimated_cost)}</span>
+            </div>
+            <p className="text-xs text-surface-500 mt-1">{data.items?.length || 0} product{(data.items?.length || 0) !== 1 ? 's' : ''} &middot; {data.monthly_total_quantity || 0} {data.items?.[0]?.unit || 'units'}</p>
+          </div>
+        </div>
+
+        {/* ── Desktop Table View (visible sm and up) ── */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-surface-700">

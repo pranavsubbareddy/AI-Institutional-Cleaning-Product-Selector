@@ -9,9 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "start": "node Backend/server.js",
-    "seed": "node Backend/src/database/seed.js",
-    "test": "echo \"Tests removed. Use end-to-end testing on production.\"",
-    "test:watch": "echo \"Tests removed. Use end-to-end testing on production.\""
+    "seed": "node Backend/src/database/seed.js"
   },
   "dependencies": {
     "@emailjs/browser": "^4.4.1",
