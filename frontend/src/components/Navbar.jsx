@@ -7,11 +7,6 @@ const ROLE_PRIMARY_LINKS = {
   admin: [
     { path: '/form', label: 'Form' },
     { path: '/admin', label: 'Dashboard' },
-    { path: '/warehouse', label: 'Warehouse' },
-    { path: '/deliveries', label: 'Deliveries' },
-    { path: '/salesman', label: 'Salesman' },
-    { path: '/compliance', label: 'Compliance' },
-    { path: '/orders', label: 'Orders' },
   ],
   sales_admin: [
     { path: '/form', label: 'Form' },
