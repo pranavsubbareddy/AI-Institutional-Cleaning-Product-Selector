@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api, formatCurrency } from '../services/api';
 import LoadingState from '../components/LoadingState';
@@ -9,6 +9,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 export default function DetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -42,7 +43,11 @@ export default function DetailPage() {
       <div className="mb-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <Link to="/dashboard" className="text-sm text-cyan-400 hover:text-cyan-300 mb-2 inline-flex items-center gap-1 transition-colors">
+            <Link
+              to={location.state?.from === 'admin' ? '/admin' : '/dashboard'}
+              state={location.state?.from === 'admin' ? { tab: location.state?.returnTab || 'activity' } : undefined}
+              className="text-sm text-cyan-400 hover:text-cyan-300 mb-2 inline-flex items-center gap-1 transition-colors"
+            >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>

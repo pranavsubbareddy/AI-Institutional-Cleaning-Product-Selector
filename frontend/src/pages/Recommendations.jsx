@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import { api, formatCurrency } from '../services/api';
 import ProductCard from '../components/ProductCard';
 import LoadingState from '../components/LoadingState';
@@ -9,6 +9,7 @@ import { sendReportToEmail, isEmailJSConfigured } from '../services/emailService
 
 export default function Recommendations() {
   const { id } = useParams();
+  const location = useLocation();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -378,7 +379,11 @@ export default function Recommendations() {
       <div className="animate-fade-in">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
           <div>
-            <Link to="/dashboard" className="text-sm text-cyan-400 hover:text-cyan-300 mb-1 inline-block transition-colors">
+            <Link
+              to={location.state?.from === 'admin' ? '/admin' : '/dashboard'}
+              state={location.state?.from === 'admin' ? { tab: location.state?.returnTab || 'activity' } : undefined}
+              className="text-sm text-cyan-400 hover:text-cyan-300 mb-1 inline-block transition-colors"
+            >
               &larr; Back to Dashboard
             </Link>
             <h1 className="text-2xl font-bold text-surface-100">Product Recommendations</h1>
