@@ -18,6 +18,9 @@ export default function DetailPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
 
+  const fromAdmin = location.state?.from === 'admin';
+  const backLabel = fromAdmin ? 'Back to Activity Log' : 'Back to Dashboard';
+
   useEffect(() => {
     fetchDetail();
   }, [id]);
@@ -44,14 +47,14 @@ export default function DetailPage() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <Link
-              to={location.state?.from === 'admin' ? '/admin' : '/dashboard'}
-              state={location.state?.from === 'admin' ? { tab: location.state?.returnTab || 'activity' } : undefined}
+              to={fromAdmin ? '/admin' : '/dashboard'}
+              state={fromAdmin ? { tab: location.state?.returnTab || 'activity' } : undefined}
               className="text-sm text-cyan-400 hover:text-cyan-300 mb-2 inline-flex items-center gap-1 transition-colors"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
-              Back to Dashboard
+              {backLabel}
             </Link>
             <h1 className="text-2xl font-bold text-surface-100">{data.name}</h1>
             <p className="text-surface-400 mt-1">Facility Details &amp; History</p>

@@ -98,15 +98,21 @@ router.get('/', validatePagination, async (req, res) => {
 
 router.get('/:id', async (req, res) => {
   try {
-    // First try to find the institution by id AND user_id (owned by current user)
-    let institution = await queryOne('SELECT * FROM institutions WHERE id = ? AND user_id = ?', [req.params.id, req.user.uid]);
+    // Admins and sales admins can view any institution (used by Activity Log)
+    let institution;
+    if (req.user.role === 'admin' || req.user.role === 'sales_admin') {
+      institution = await queryOne('SELECT * FROM institutions WHERE id = ?', [req.params.id]);
+    } else {
+      // First try to find the institution by id AND user_id (owned by current user)
+      institution = await queryOne('SELECT * FROM institutions WHERE id = ? AND user_id = ?', [req.params.id, req.user.uid]);
 
-    // If not found by user_id, fallback to contact_email match (same behavior as /dashboard/institutions)
-    if (!institution && req.user.email) {
-      institution = await queryOne('SELECT * FROM institutions WHERE id = ? AND contact_email = ?', [req.params.id, req.user.email.toLowerCase().trim()]);
-      if (institution) {
-        // Backfill user_id so future operations work correctly
-        await run('UPDATE institutions SET user_id = ? WHERE id = ?', [req.user.uid, req.params.id]);
+      // If not found by user_id, fallback to contact_email match (same behavior as /dashboard/institutions)
+      if (!institution && req.user.email) {
+        institution = await queryOne('SELECT * FROM institutions WHERE id = ? AND contact_email = ?', [req.params.id, req.user.email.toLowerCase().trim()]);
+        if (institution) {
+          // Backfill user_id so future operations work correctly
+          await run('UPDATE institutions SET user_id = ? WHERE id = ?', [req.user.uid, req.params.id]);
+        }
       }
     }
 
