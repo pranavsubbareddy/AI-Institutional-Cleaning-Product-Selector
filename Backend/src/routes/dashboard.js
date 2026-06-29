@@ -34,7 +34,7 @@ router.get('/stats', async (req, res, next) => {
         queryAll(`SELECT COUNT(*) as count FROM recommendations WHERE institution_id IN (${placeholders})`, userInstIds),
         queryAll(`SELECT COALESCE(SUM(total_estimated_cost), 0) as total FROM recommendations WHERE status = 'Processed' AND institution_id IN (${placeholders})`, userInstIds),
         queryAll(`SELECT COUNT(*) as count FROM recommendations WHERE status IN ('Processed', 'Pending_AI') AND institution_id IN (${placeholders})`, userInstIds),
-        queryAll(`SELECT status, COUNT(*) as count FROM recommendations WHERE institution_id IN (${placeholders}) GROUP BY status`, userInstIds),
+        queryAll(`SELECT status FROM recommendations WHERE institution_id IN (${placeholders})`, userInstIds),
         queryAll(`SELECT id, total_estimated_cost, created_at, status, source, owner, institution_id FROM recommendations WHERE institution_id IN (${placeholders}) ORDER BY created_at DESC LIMIT 10`, userInstIds)
       ]);
       // Enrich recentRecommendations with institution names
@@ -42,6 +42,8 @@ router.get('/stats', async (req, res, next) => {
         const inst = await queryOne('SELECT name as institution_name, institution_type FROM institutions WHERE id = ?', [rec.institution_id]);
         return { ...rec, ...(inst || {}) };
       }));
+      // Aggregate recommendations by status in JavaScript
+      recommendationsByStatus = aggregateByField(recommendationsByStatus, 'status');
     }
 
     const [rawTypes, rawHygiene, rawBudgets] = await Promise.all([
