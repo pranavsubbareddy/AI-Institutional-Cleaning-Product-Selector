@@ -39,7 +39,6 @@ export default function AdminDashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [exporting, setExporting] = useState(false);
   const [activeSection, setActiveSection] = useState('overview');
   const [users, setUsers] = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
@@ -198,138 +197,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // ── Export system report as PDF ─────────────────────────────────────
-  const exportSystemReport = async () => {
-    setExporting(true);
-    try {
-      const reportId = 'sys-report-' + Date.now();
-      const now = new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-
-      const reportHTML = `
-        <!DOCTYPE html>
-        <html>
-        <head><meta charset="utf-8"><title>System Report - Ganga Maxx</title>
-        <style>
-          @page { margin: 15mm 12mm; }
-          * { box-sizing: border-box; }
-          body { font-family: 'Segoe UI', Arial, sans-serif; color: #1a1a2e; padding: 0; margin: 0; font-size: 11px; line-height: 1.5; }
-          .report-header { text-align: center; padding: 18px 0 14px; border-bottom: 3px solid #f59e0b; margin-bottom: 16px; }
-          .report-header h1 { margin: 0; font-size: 20px; color: #1a1a2e; font-weight: 700; }
-          .report-header p { margin: 4px 0 0; font-size: 11px; color: #6b7280; }
-          .section-title { font-size: 13px; font-weight: 700; color: #f59e0b; margin: 16px 0 8px; padding-bottom: 4px; border-bottom: 1px solid #e5e7eb; }
-          .stat-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px; }
-          .stat-card { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px; }
-          .stat-card .label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7280; font-weight: 600; }
-          .stat-card .value { font-size: 16px; font-weight: 700; color: #1a1a2e; margin-top: 2px; }
-          .bar-section { margin-bottom: 10px; }
-          .bar-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; font-size: 10px; }
-          .bar-track { background: #e5e7eb; height: 8px; border-radius: 4px; overflow: hidden; margin-bottom: 6px; }
-          .bar-fill { height: 8px; border-radius: 4px; background: linear-gradient(90deg, #f59e0b, #d97706); }
-          .ops-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
-          .ops-item { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 4px; padding: 8px; text-align: center; }
-          .ops-item .num { font-size: 14px; font-weight: 700; color: #1a1a2e; }
-          .ops-item .lbl { font-size: 9px; color: #6b7280; }
-          table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 9px; }
-          th { background: #f3f4f6; text-align: left; padding: 5px 6px; font-size: 8px; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7280; border-bottom: 1px solid #e5e7eb; }
-          td { padding: 4px 6px; border-bottom: 1px solid #f3f4f6; color: #374151; }
-          .footer { text-align: center; padding-top: 14px; margin-top: 16px; border-top: 1px solid #e5e7eb; font-size: 9px; color: #9ca3af; }
-          .tag { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 8px; font-weight: 600; background: #f3f4f6; color: #374151; }
-          .tag-cyan { background: #e0f2fe; color: #0284c7; }
-          .tag-emerald { background: #d1fae5; color: #059669; }
-          .tag-amber { background: #fef3c7; color: #d97706; }
-        </style>
-        </head><body>
-        <div class="report-header">
-          <h1>Ganga Maxx — System Report</h1>
-          <p>Generated ${now} &middot; AI Institutional Cleaning Platform</p>
-        </div>
-
-        <div class="section-title">Overview</div>
-        <div class="stat-grid">
-          <div class="stat-card"><div class="label">Facilities</div><div class="value">${overview.total_institutions || 0}</div></div>
-          <div class="stat-card"><div class="label">Users</div><div class="value">${overview.total_users || 0}</div></div>
-          <div class="stat-card"><div class="label">Pipeline Value</div><div class="value">Rs ${(overview.total_estimated_cost || 0).toLocaleString('en-IN')}</div></div>
-          <div class="stat-card"><div class="label">Active Recs</div><div class="value">${overview.active_recommendations || 0}</div></div>
-        </div>
-        <div class="stat-grid">
-          <div class="stat-card"><div class="label">Products</div><div class="value">${overview.total_products || 0}</div></div>
-          <div class="stat-card"><div class="label">Recommendations</div><div class="value">${overview.total_recommendations || 0}</div></div>
-          <div class="stat-card"><div class="label">Orders</div><div class="value">${overview.total_orders || 0}</div></div>
-          <div class="stat-card"><div class="label">Recs Processed</div><div class="value">${(data.recommendations_by_status?.find(s => s.status === 'Processed')?.count) || 0}</div></div>
-        </div>
-
-        <div class="section-title">Institutions by Type</div>
-        <div class="bar-section">
-          ${(data.institutions_by_type || []).map(item => {
-            const max = Math.max(...(data.institutions_by_type || []).map(t => t.count));
-            return `<div><div class="bar-row"><span>${item.institution_type.replace(/_/g, ' ')}</span><span><strong>${item.count}</strong></span></div><div class="bar-track"><div class="bar-fill" style="width:${(item.count / (max || 1)) * 100}%"></div></div></div>`;
-          }).join('') || '<p style="color:#9ca3af;">No data</p>'}
-        </div>
-
-        <div class="section-title">Operations</div>
-        <div class="ops-grid">
-          <div class="ops-item"><div class="num">${ops.warehouses || 0}</div><div class="lbl">Warehouses</div></div>
-          <div class="ops-item"><div class="num">${ops.stock_batches || 0}</div><div class="lbl">Stock Batches</div></div>
-          <div class="ops-item"><div class="num">${ops.active_deliveries || 0}</div><div class="lbl">Active Deliveries</div></div>
-          <div class="ops-item"><div class="num">${ops.salesman_visits || 0}</div><div class="lbl">Salesman Visits</div></div>
-          <div class="ops-item"><div class="num">${ops.compliance_documents || 0}</div><div class="lbl">Compliance Docs</div></div>
-        </div>
-
-        <div class="section-title">Analytics</div>
-        <div class="stat-grid">
-          ${(data.hygiene_stats || []).map(item =>
-            `<div class="stat-card"><div class="label">${item.hygiene_standard}</div><div class="value">${item.count}</div></div>`
-          ).join('') || ''}
-          ${(data.budget_stats || []).map(item =>
-            `<div class="stat-card"><div class="label">${item.budget || 'Unknown'}</div><div class="value">${item.count}</div></div>`
-          ).join('') || ''}
-        </div>
-
-        <div class="section-title">Recent Activity (${(data.recent_activity || []).length} events)</div>
-        <table>
-          <tr><th>Action</th><th>Summary</th><th>User</th><th>Time</th></tr>
-          ${(data.recent_activity || []).slice(0, 15).map(event => {
-            const ts = event.timestamp ? new Date(event.timestamp).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
-            return `<tr><td><span class="tag ${event.type === 'recommendation' ? 'tag-cyan' : 'tag-emerald'}">${event.action}</span></td><td>${event.summary || ''}</td><td>${event.user || ''}</td><td>${ts}</td></tr>`;
-          }).join('')}
-        </table>
-
-        <div class="footer">
-          Ganga Maxx Institutional Cleaning Platform &middot; AI-Powered &middot; Report ID: ${reportId}
-        </div>
-        </body></html>
-      `;
-
-      const container = document.createElement('div');
-      container.innerHTML = reportHTML;
-      // Positioned below viewport so it never appears on screen
-      container.style.cssText = 'position:fixed;top:100vh;left:0;width:794px;background:#ffffff;opacity:1;pointer-events:none;z-index:-1;';
-      document.body.appendChild(container);
-
-      // Small delay to let the browser render the content
-      await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 300)));
-
-      const { default: html2pdf } = await import('html2pdf.js');
-      await html2pdf()
-        .set({
-          margin: [10, 8, 10, 8],
-          filename: 'GangaMaxx-System-Report-' + new Date().toISOString().slice(0, 10) + '.pdf',
-          image: { type: 'jpeg', quality: 0.95 },
-          html2canvas: { scale: 2, useCORS: true, letterRendering: true, backgroundColor: '#ffffff' },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-          pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-        })
-        .from(container)
-        .save();
-
-      document.body.removeChild(container);
-    } catch (err) {
-      console.error('PDF export failed:', err);
-    } finally {
-      setExporting(false);
-    }
-  };
-
   if (loading) return <LoadingState message="Loading Admin Dashboard..." />;
   if (error) return <ErrorState message={error} onRetry={fetchData} />;
   if (!data) return <ErrorState message="No data available" onRetry={fetchData} />;
@@ -350,23 +217,6 @@ export default function AdminDashboard() {
           <p className="text-surface-400 text-sm">System-wide metrics, operations, and activity logs</p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={exportSystemReport}
-            disabled={exporting}
-            className={'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ' + (exporting ? 'bg-surface-700 text-surface-400 border-surface-600 cursor-not-allowed' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20')}
-          >
-            <svg className={"w-3.5 h-3.5 " + (exporting ? 'animate-spin' : '')} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              {exporting ? (
-                <>
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </>
-              ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              )}
-            </svg>
-            {exporting ? 'Generating...' : 'Export PDF'}
-          </button>
           <Link to="/admin-portal" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 text-xs font-medium hover:bg-amber-500/20 transition-all">
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
