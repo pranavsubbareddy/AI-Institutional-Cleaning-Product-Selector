@@ -1203,4 +1203,26 @@ async function backfillUserInstitutionsByEmail(email, uid) {
   }
 }
 
-module.exports = { getPool, initializeSchema, queryAll, queryOne, run, closePool, safeJsonParse, backfillUserInstitutionsByEmail };
+/**
+ * Aggregate an array of rows by a given field, returning an array of
+ * { [fieldName]: value, count: number } sorted by count descending.
+ * Replaces SQL GROUP BY + COUNT(*) for the in-memory engine which doesn't
+ * support aggregation natively.
+ *
+ * @param {Array<Object>} rows - Array of row objects
+ * @param {string} fieldName - The field to group by
+ * @param {string} [defaultValue='Unknown'] - Fallback for null/undefined
+ * @returns {Array<Object>}
+ */
+function aggregateByField(rows, fieldName, defaultValue = 'Unknown') {
+  const counts = {};
+  rows.forEach(row => {
+    const val = row[fieldName] !== null && row[fieldName] !== undefined ? row[fieldName] : defaultValue;
+    counts[val] = (counts[val] || 0) + 1;
+  });
+  return Object.entries(counts)
+    .map(([key, count]) => ({ [fieldName]: key, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
+module.exports = { getPool, initializeSchema, queryAll, queryOne, run, closePool, safeJsonParse, backfillUserInstitutionsByEmail, aggregateByField };

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { queryAll, queryOne, run, safeJsonParse } = require('../database/schema');
+const { queryAll, queryOne, run, safeJsonParse, aggregateByField } = require('../database/schema');
 const { requireAuth } = require('../middleware/auth');
 
 // Admin-only middleware
@@ -15,7 +15,7 @@ router.use((req, res, next) => {
 // GET /api/admin/dashboard - system-wide stats
 router.get('/dashboard', async (req, res, next) => {
   try {
-    const [instCount, recCount, ordCount, prodCount, usersCount, recCost, recentRecsRaw, recentInsts, typeStats, hygieneStats, budgetStats, statusStats, whCount, stockCount, deliveryCount, salesmanCount, complianceDocs, reorderAlerts] = await Promise.all([
+    const [instCount, recCount, ordCount, prodCount, usersCount, recCost, recentRecsRaw, recentInsts, rawTypes, rawHygiene, rawBudgets, rawStatuses, whCount, stockCount, deliveryCount, salesmanCount, complianceDocs, reorderAlerts] = await Promise.all([
       queryAll('SELECT COUNT(*) as count FROM institutions'),
       queryAll('SELECT COUNT(*) as count FROM recommendations'),
       queryAll('SELECT COUNT(*) as count FROM orders'),
@@ -24,10 +24,10 @@ router.get('/dashboard', async (req, res, next) => {
       queryAll("SELECT COALESCE(SUM(total_estimated_cost), 0) as total FROM recommendations WHERE status = 'Processed'"),
       queryAll('SELECT id, total_estimated_cost, created_at, status, source, owner, institution_id FROM recommendations ORDER BY created_at DESC LIMIT 15'),
       queryAll('SELECT id, name, institution_type, area_size, hygiene_standard, budget, status, user_id, created_at FROM institutions ORDER BY created_at DESC LIMIT 10'),
-      queryAll('SELECT institution_type, COUNT(*) as count FROM institutions GROUP BY institution_type ORDER BY count DESC'),
-      queryAll('SELECT hygiene_standard, COUNT(*) as count FROM institutions GROUP BY hygiene_standard'),
-      queryAll('SELECT budget, COUNT(*) as count FROM institutions GROUP BY budget'),
-      queryAll('SELECT status, COUNT(*) as count FROM recommendations GROUP BY status ORDER BY count DESC'),
+      queryAll('SELECT institution_type FROM institutions'),
+      queryAll('SELECT hygiene_standard FROM institutions'),
+      queryAll('SELECT budget FROM institutions'),
+      queryAll('SELECT status FROM recommendations'),
       queryAll('SELECT COUNT(*) as count FROM warehouses'),
       queryAll('SELECT COUNT(*) as count FROM stock_batches'),
       queryAll("SELECT COUNT(*) as count FROM delivery_runs WHERE status = 'scheduled' OR status = 'in_transit'"),
@@ -35,6 +35,12 @@ router.get('/dashboard', async (req, res, next) => {
       queryAll('SELECT COUNT(*) as count FROM msds_documents'),
       queryAll("SELECT COUNT(*) as count FROM reorder_reminders WHERE status = 'active'")
     ]);
+
+    // Aggregate in JavaScript (supports both MySQL and in-memory engine)
+    const typeStats = aggregateByField(rawTypes, 'institution_type');
+    const hygieneStats = aggregateByField(rawHygiene, 'hygiene_standard');
+    const budgetStats = aggregateByField(rawBudgets, 'budget');
+    const statusStats = aggregateByField(rawStatuses, 'status');
 
     // Enrich recent recommendations with institution names
     const recentRecs = await Promise.all((recentRecsRaw || []).map(async (rec) => {

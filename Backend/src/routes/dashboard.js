@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { queryAll, queryOne, safeJsonParse } = require('../database/schema');
+const { queryAll, queryOne, safeJsonParse, aggregateByField } = require('../database/schema');
 const { requireAuth } = require('../middleware/auth');
 
 // All dashboard routes require authentication
@@ -44,11 +44,14 @@ router.get('/stats', async (req, res, next) => {
       }));
     }
 
-    const [institutionsByType, hygieneStats, budgetStats] = await Promise.all([
-      queryAll('SELECT institution_type, COUNT(*) as count FROM institutions WHERE user_id = ? GROUP BY institution_type ORDER BY count DESC', [uid]),
-      queryAll('SELECT hygiene_standard, COUNT(*) as count FROM institutions WHERE user_id = ? GROUP BY hygiene_standard', [uid]),
-      queryAll('SELECT budget, COUNT(*) as count FROM institutions WHERE user_id = ? GROUP BY budget', [uid])
+    const [rawTypes, rawHygiene, rawBudgets] = await Promise.all([
+      queryAll('SELECT institution_type FROM institutions WHERE user_id = ?', [uid]),
+      queryAll('SELECT hygiene_standard FROM institutions WHERE user_id = ?', [uid]),
+      queryAll('SELECT budget FROM institutions WHERE user_id = ?', [uid])
     ]);
+    const institutionsByType = aggregateByField(rawTypes, 'institution_type');
+    const hygieneStats = aggregateByField(rawHygiene, 'hygiene_standard');
+    const budgetStats = aggregateByField(rawBudgets, 'budget');
 
     const totalEstimatedCost = costResult[0]?.total || 0;
 
